@@ -61,7 +61,8 @@ lane-os/
 │   │   └── block-cross-lane-write.py   # PreToolUse guard enforcing the invariant
 │   ├── new-lane.sh        # scaffold a new code lane or desk
 │   ├── build-switchboard.py            # cross-lane awareness cache
-│   └── install.sh         # one-time machine setup (symlinks, hook registration)
+│   ├── install.sh         # one-time machine setup (symlinks, hook registration)
+│   └── remote/            # always-on hosts: code from your phone, non-sandbox
 └── switchboard/           # local, gitignored cache of what moved in other lanes
 ```
 
@@ -90,6 +91,12 @@ To start a **code lane**, point a session at any code repo on your machine and a
 
 ---
 
+## Code from anywhere, without a sandbox
+
+Once your lanes exist, you can drive **real, full-filesystem sessions from your phone or any laptop**, against your actual repos with your real secrets and tools, by keeping a few always-on `claude remote-control` sessions on one machine you leave on. One host per lane means each one boots already scoped to the right context and write boundary. This is the opposite of the in-app sandbox (single repo, no secrets, pull-request only). See [`docs/code-from-anywhere.md`](docs/code-from-anywhere.md) and [`scripts/remote/`](scripts/remote/).
+
+---
+
 ## Why a spine instead of one giant CLAUDE.md
 
 A single ever-growing instruction file gets loaded in full on every session, gets expensive, and still does not hold the state that actually changes day to day. Lane OS splits the two:
@@ -109,6 +116,7 @@ This keeps the always-loaded payload small while giving every session reliable a
 - [`docs/session-lifecycle.md`](docs/session-lifecycle.md) - the SessionStart hook, restart vs refresh
 - [`docs/memory.md`](docs/memory.md) - the durable-facts memory system
 - [`docs/multi-machine.md`](docs/multi-machine.md) - symlinks, sync, working across machines
+- [`docs/code-from-anywhere.md`](docs/code-from-anywhere.md) - drive real, non-sandbox sessions from your phone or any laptop
 - [`docs/getting-started.md`](docs/getting-started.md) - adopt it step by step
 
 ---

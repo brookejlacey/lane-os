@@ -31,9 +31,12 @@ The hook and guard locate the spine via `LANE_OS_ROOT` first, then a list of com
 locations. If your spine lives somewhere unusual on a given machine, set
 `LANE_OS_ROOT` in that machine's shell profile and everything else follows.
 
-## Remote / always-on hosts
+## Remote / always-on hosts (code from anywhere)
 
-You can run always-on sessions on a home server or remote host (for example, to drive
-from a phone). Each lane you want reachable becomes its own long-running session rooted
-in that lane's directory, so it boots with the right context and write boundary. The
-same hook and guard apply unchanged.
+You can run always-on sessions on a machine you leave on and drive them from your phone
+or another laptop, with the full filesystem and your real secrets, not a sandbox. Each
+lane you want reachable becomes its own long-running session rooted in that lane's
+directory, so it boots with the right context and write boundary, and the same hook and
+guard apply unchanged. This is a big enough capability to have its own guide:
+**[`docs/code-from-anywhere.md`](code-from-anywhere.md)** (architecture, the keep-alive
+setup, refreshing remotely, and the claude.ai auth gotcha).
