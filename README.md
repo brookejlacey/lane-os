@@ -53,7 +53,7 @@ lane-os/
 │   └── _TEMPLATE/         # STATUS.md + MEMORY.md to copy per code lane
 ├── desks/                 # topic desks
 │   └── _TEMPLATE/         # CLAUDE.md + LOG.md to copy per desk
-├── skills/                # lifecycle slash-commands (orient, catchup, today, spark, ...)
+├── skills/                # lifecycle slash-commands (orient, catchup, today, spark, recall, ...)
 ├── hooks/
 │   └── session-start.sh   # detects the lane, pulls, injects a read-directive
 ├── scripts/
@@ -118,6 +118,8 @@ This keeps the always-loaded payload small while giving every session reliable a
 - [`docs/multi-machine.md`](docs/multi-machine.md) - symlinks, sync, working across machines
 - [`docs/code-from-anywhere.md`](docs/code-from-anywhere.md) - drive real, non-sandbox sessions from your phone or any laptop
 - [`docs/getting-started.md`](docs/getting-started.md) - adopt it step by step
+
+- [`llms.txt`](llms.txt) - documentation map for pointing an AI agent at the repo in one paste (with `llms-full.txt`, the whole doc set concatenated into one fetchable file)
 
 ---
 

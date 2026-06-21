@@ -1,0 +1,34 @@
+# Lane OS
+
+> A multi-session operating system for Claude Code: parallel, single-topic "lanes" over a shared, persistent context spine. Lane OS is a repository layout plus a small set of hooks, skills, and conventions that let you run many AI coding sessions at once without them clobbering each other, and without re-explaining your world at the start of every session. It is a scaffold, not a dependency: you clone it, make it yours, and the conventions do the work.
+
+Lane OS solves two problems that appear the moment you take agentic coding seriously: (1) parallel sessions conflict when they all write the same shared state, and (2) every new session starts amnesiac. The fix is one rule, "one window = one topic," enforced by the write-lane invariant: a session may write only to the lane it owns. There are three lane types (code lane, topic desk, spine) over one shared spine repo.
+
+## Start here
+
+- [README](https://github.com/brookejlacey/lane-os/blob/main/README.md): what Lane OS is, the three lane types, the directory layout, and quickstart.
+- [Getting started](https://github.com/brookejlacey/lane-os/blob/main/docs/getting-started.md): adopt it step by step.
+- [Philosophy](https://github.com/brookejlacey/lane-os/blob/main/docs/philosophy.md): one window = one topic, and why.
+
+## Core concepts
+
+- [Architecture](https://github.com/brookejlacey/lane-os/blob/main/docs/architecture.md): the three lane types and the shared spine in detail.
+- [The write-lane invariant](https://github.com/brookejlacey/lane-os/blob/main/docs/write-lane-invariant.md): the safety rule that makes parallelism work, and why it is structural rather than a preference.
+- [Session lifecycle](https://github.com/brookejlacey/lane-os/blob/main/docs/session-lifecycle.md): the SessionStart hook, restart versus refresh, and how state is read on demand instead of pasted wholesale.
+- [Memory](https://github.com/brookejlacey/lane-os/blob/main/docs/memory.md): the durable-facts memory system, one file per fact, frontmatter-indexed.
+
+## Operating it
+
+- [Multi-machine](https://github.com/brookejlacey/lane-os/blob/main/docs/multi-machine.md): symlinks, sync, and working across machines.
+- [Code from anywhere](https://github.com/brookejlacey/lane-os/blob/main/docs/code-from-anywhere.md): drive real, non-sandbox sessions from your phone or any laptop.
+- [Skills](https://github.com/brookejlacey/lane-os/tree/main/skills): the lifecycle slash-commands (orient, catchup, today, week, since, spark, spin-lane, recall).
+
+## Key files
+
+- [global/CLAUDE.md](https://github.com/brookejlacey/lane-os/blob/main/global/CLAUDE.md): the constitution, behavioral rules loaded every session.
+- [hooks/session-start.sh](https://github.com/brookejlacey/lane-os/blob/main/hooks/session-start.sh): detects the lane, pulls the spine, and injects the read-directive.
+- [scripts/hooks/block-cross-lane-write.py](https://github.com/brookejlacey/lane-os/blob/main/scripts/hooks/block-cross-lane-write.py): the PreToolUse guard that enforces the invariant at the keystroke.
+
+## Optional
+
+- [REFERENCE](https://github.com/brookejlacey/lane-os/blob/main/global/REFERENCE.md): read-on-demand setup and architecture notes.
