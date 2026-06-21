@@ -1,0 +1,25 @@
+# Lane OS: the switchboard is a LOCAL, per-machine cache, never committed.
+switchboard/state.json
+switchboard/SWITCHBOARD.html
+
+# Local credentials and secrets never belong in the spine repo.
+.env
+.env.*
+*.local
+secrets/
+.config/
+
+# OS + editor noise
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/
+
+# Your real spine content is private. This public scaffold ships TEMPLATES only.
+# When you adopt Lane OS, remove the lines below in YOUR private fork so your
+# real context is tracked. They exist here so the public template stays generic.
+# brain/*.md
+# memory/*.md
+# projects/*/
+# desks/*/
