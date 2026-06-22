@@ -50,3 +50,17 @@ Decline and redirect BEFORE the write, never comply then apologize. Two redirect
 Set `LANE_GUARD_OFF=1` to disable the guard for a session where you are deliberately
 doing cross-lane setup (for example, bootstrapping a brand new repo). Use it
 knowingly.
+
+## Verifying the guard
+
+If you edit the guard or rearrange your spine, prove the invariant still holds:
+
+```bash
+bash scripts/test-lanes.sh
+```
+
+It feeds the guard the PreToolUse JSON for representative writes (drafts, spine,
+code lane, desk) and asserts each is allowed or blocked as the invariant requires.
+A fork should run this after any change to `block-cross-lane-write.py`. Run
+`bash scripts/lane-doctor.sh` too, to catch dangling `[[wikilinks]]` and memory the
+index has lost track of.
