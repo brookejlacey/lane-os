@@ -1,0 +1,30 @@
+# Lane OS workspace manifest: what the rules sync and the switchboard know about your
+# code lanes. Read by scripts/workspace_lib.py. Comments are allowed; the subset of
+# TOML used here (strings, string arrays, booleans, [tables] and [[arrays of tables]])
+# parses on any Python 3 (tomllib when present, a small fallback otherwise).
+
+[workspace]
+# Directories that hold your code repos, one repo per child directory.
+workspace_roots = ["~/repos", "~/work"]
+
+[globals]
+source = "global/CLAUDE.md"
+# The generated copy of the constitution inside each code lane, and the stub that imports it.
+sync_copy = ".claude/global-rules.md"
+stub = "CLAUDE.md"
+# Some agents read AGENTS.md instead. The sync keeps a marked block current there too.
+agents = "AGENTS.md"
+generated_header = "<!-- GENERATED from the spine by scripts/sync-rules.py. Do not edit here; edit global/CLAUDE.md in the spine and re-run the sync. -->"
+agents_begin = "<!-- BEGIN GENERATED SPINE RULES -->"
+agents_end = "<!-- END GENERATED SPINE RULES -->"
+# Repos the sync must never write into, for reasons OTHER than being published to an
+# outside reader. Those are denied automatically: scripts/workspace_lib.py derives them
+# from the AUDIENCES table in scripts/publish-shared-repo.py, so a new shared repo is
+# covered the day it exists, without anyone remembering to add it here.
+deny_sync = ["lane-os"]
+
+# Code lanes that receive the rules. A repo not listed here is still picked up when it
+# already carries a generated copy (so a lane you bootstrapped by hand keeps syncing).
+[[repos]]
+name = "example-app"
+sync_globals = true
