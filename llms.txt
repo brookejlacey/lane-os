@@ -1,34 +1,48 @@
 # Lane OS
 
-> A multi-session operating system for Claude Code: parallel, single-topic "lanes" over a shared, persistent context spine. Lane OS is a repository layout plus a small set of hooks, skills, and conventions that let you run many AI coding sessions at once without them clobbering each other, and without re-explaining your world at the start of every session. It is a scaffold, not a dependency: you clone it, make it yours, and the conventions do the work.
+> A multi-session operating system for Claude Code: parallel, single-topic "lanes" over a shared, persistent context spine, with the rules that govern it enforced by hooks and commit checks instead of remembered. Lane OS is a repository layout plus a small set of hooks, checks, skills and conventions. It is a scaffold, not a dependency: you clone it, make it yours, and the conventions and the checks do the work.
 
-Lane OS solves two problems that appear the moment you take agentic coding seriously: (1) parallel sessions conflict when they all write the same shared state, and (2) every new session starts amnesiac. The fix is one rule, "one window = one topic," enforced by the write-lane invariant: a session may write only to the lane it owns. There are three lane types (code lane, topic desk, spine) over one shared spine repo.
+Lane OS solves three problems: (1) parallel sessions conflict when they all write the same shared state, (2) every new session starts amnesiac, and (3) rules held only in prose decay. The fixes: "one window = one topic" enforced by the write-lane invariant (a session may write only the lane it owns); a synthesis layer (brain/, memory/) read on demand via a pointer hook; and a constitution where every rule either names the hook or check that enforces it or is triaged as judgment, with the coverage ratio measured on every commit.
 
 ## Start here
 
-- [README](https://github.com/brookejlacey/lane-os/blob/main/README.md): what Lane OS is, the three lane types, the directory layout, and quickstart.
-- [Getting started](https://github.com/brookejlacey/lane-os/blob/main/docs/getting-started.md): adopt it step by step.
-- [Philosophy](https://github.com/brookejlacey/lane-os/blob/main/docs/philosophy.md): one window = one topic, and why.
+- [README](README.md): what Lane OS is, what you get (ordered by what is hardest to find elsewhere), the layout, quickstart, and what it does not do.
+- [Getting started](docs/getting-started.md): adopt it step by step.
+- [Philosophy](docs/philosophy.md): one window = one topic, and why.
 
 ## Core concepts
 
-- [Architecture](https://github.com/brookejlacey/lane-os/blob/main/docs/architecture.md): the three lane types and the shared spine in detail.
-- [The write-lane invariant](https://github.com/brookejlacey/lane-os/blob/main/docs/write-lane-invariant.md): the safety rule that makes parallelism work, and why it is structural rather than a preference.
-- [Session lifecycle](https://github.com/brookejlacey/lane-os/blob/main/docs/session-lifecycle.md): the SessionStart hook, restart versus refresh, and how state is read on demand instead of pasted wholesale.
-- [Memory](https://github.com/brookejlacey/lane-os/blob/main/docs/memory.md): the durable-facts memory system, one file per fact, frontmatter-indexed.
+- [Architecture](docs/architecture.md): the three lane types and the shared spine.
+- [The write-lane invariant](docs/write-lane-invariant.md): the safety rule that makes parallelism work, the guard, and the test that proves the guard blocks.
+- [Session lifecycle](docs/session-lifecycle.md): the SessionStart pointer hook, restart versus refresh.
+- [Gated rules](docs/gated-rules.md): gated or judgment, the coverage ratchet, why a fail-open guard needs a self-test.
+- [The miss-to-rule loop](docs/miss-to-rule-loop.md): what a found miss turns into, and how /reflect implement runs it.
+- [Concerns](docs/concerns.md): every open concern declares a Probe or an Owner.
+- [Context budgets](docs/context-budgets.md): byte budgets on every file a session reads whole, one table.
+- [Behavioural rules](docs/agent-toward-human.md): how the agent treats the human; the reply envelope.
+- [Memory](docs/memory.md): durable facts, one file per fact, frontmatter-indexed.
 
 ## Operating it
 
-- [Multi-machine](https://github.com/brookejlacey/lane-os/blob/main/docs/multi-machine.md): symlinks, sync, and working across machines.
-- [Code from anywhere](https://github.com/brookejlacey/lane-os/blob/main/docs/code-from-anywhere.md): drive real, non-sandbox sessions from your phone or any laptop.
-- [Skills](https://github.com/brookejlacey/lane-os/tree/main/skills): the lifecycle slash-commands (orient, catchup, today, week, since, spark, spin-lane, recall).
+- [Drift checks](docs/drift-checks.md): audit-cheap's fifteen checks and the staged commit gate.
+- [The reply-length gate](docs/reply-length-gate.md): a Stop hook that measures, a UserPromptSubmit hook that instructs.
+- [The switchboard](docs/switchboard.md): what the other windows are doing, and what each lane is on.
+- [Rules sync and shared repos](docs/rules-sync-and-shared-repos.md): propagation that defers around live sessions and never reaches a repo an outside reader sees; the publisher.
+- [Parallel lanes and worktrees](docs/parallel-lanes-worktrees.md): two sessions in one lane.
+- [Multi-machine](docs/multi-machine.md): symlinks, sync, working across machines.
+- [Code from anywhere](docs/code-from-anywhere.md): real, non-sandbox sessions from your phone.
+- [Skills](skills): orient, catchup, today, week, since, spark, spin-lane, recall, reflect, preflight, ship.
 
 ## Key files
 
-- [global/CLAUDE.md](https://github.com/brookejlacey/lane-os/blob/main/global/CLAUDE.md): the constitution, behavioral rules loaded every session.
-- [hooks/session-start.sh](https://github.com/brookejlacey/lane-os/blob/main/hooks/session-start.sh): detects the lane, pulls the spine, and injects the read-directive.
-- [scripts/hooks/block-cross-lane-write.py](https://github.com/brookejlacey/lane-os/blob/main/scripts/hooks/block-cross-lane-write.py): the PreToolUse guard that enforces the invariant at the keystroke.
+- [global/CLAUDE.md](global/CLAUDE.md): the constitution; opens with its measured gated-coverage count.
+- [global/rule-triage.tsv](global/rule-triage.tsv): rules that genuinely cannot be gated, with the reason.
+- [global/REFERENCE.md](global/REFERENCE.md): hooks, checks, scripts, environment variables, routing.
+- [hooks/session-start.sh](hooks/session-start.sh): detects the lane, pulls the spine, injects the read-directive.
+- [scripts/hooks/block-cross-lane-write.py](scripts/hooks/block-cross-lane-write.py): the PreToolUse guard that enforces the invariant.
+- [scripts/audit-cheap.sh](scripts/audit-cheap.sh): the drift checks.
+- [scripts/probe-concerns.py](scripts/probe-concerns.py), [scripts/check-file-budgets.py](scripts/check-file-budgets.py), [scripts/find-decayed-rules.py](scripts/find-decayed-rules.py), [scripts/sync-rules.py](scripts/sync-rules.py), [scripts/publish-shared-repo.py](scripts/publish-shared-repo.py), [scripts/build-switchboard.py](scripts/build-switchboard.py).
 
 ## Optional
 
-- [REFERENCE](https://github.com/brookejlacey/lane-os/blob/main/global/REFERENCE.md): read-on-demand setup and architecture notes.
+- [llms-full.txt](llms-full.txt): the whole documentation set concatenated into one fetchable file.

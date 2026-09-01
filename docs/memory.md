@@ -43,3 +43,16 @@ it needs.
 - Link related memories with `[[name]]` so recall pulls the cluster, not just the hit.
 - A recalled memory reflects what was true when written; verify a named file or flag
   still exists before acting on it.
+
+## How facts get in
+
+Saving a fact used to depend on the model noticing, mid-session, that a fact was
+durable. `/reflect` makes the sweep a step: it dedups against what is already recorded,
+stages additive facts in `brain/drafts/` for the next spine merge, and puts anything
+that would change an always-loaded instruction under a section the human decides.
+`/reflect implement` goes one step further and lands a learning as a gate. See
+[`miss-to-rule-loop.md`](miss-to-rule-loop.md).
+
+`scripts/lane-doctor.sh` (Check 3) keeps the index honest: every memory file listed,
+every `[[wikilink]]` resolving. `memory/MEMORY.md` carries a byte budget like every other
+file a session reads whole.

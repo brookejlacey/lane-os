@@ -2,8 +2,7 @@
 
 Lookup material that does NOT need to be in context every session. `global/CLAUDE.md`
 carries the behavioral rules and points here. Read this when doing machine setup,
-debugging the SessionStart hook, onboarding a new repo or machine, or changing how
-config syncs.
+debugging a hook, onboarding a new repo or machine, or changing how config syncs.
 
 ## Session routing (which session to open for what)
 
@@ -13,77 +12,118 @@ about the work at large, open the spine.
 | Working on... | Open a session in... |
 |---|---|
 | Code (any product repo) | That repo |
-| Project-specific docs, status updates | That repo's session (writes land in `projects/<name>/`) or the spine |
+| Project-specific docs, status updates | That repo (writes land in `projects/<name>/`), or `projects/<name>/` itself |
 | Cross-cutting context (ACTIVE_NOW, DECISIONS, CONCERNS, PEOPLE) | The spine (workspace-root) |
 | An ongoing non-code topic | Its `desks/<topic>/` |
 | Daily orient, cross-project planning, merges | The spine |
 
 **The mid-session switch:** if something cross-cutting surfaces while you are in a
-code lane, do NOT update the spine from there. Drop a note in the lane's `STATUS.md`
-or stage to `brain/drafts/`, and let a spine session merge it. Editing spine files
-from a code lane is exactly what the write-lane guard blocks.
+code lane, do NOT update the spine from there. Stage to `brain/drafts/` and let a spine
+session merge it. Editing spine files from a code lane is exactly what the guard blocks.
+A lane you cannot write is still a lane you can drive: `cd <repo> && claude -p "<goal>"`.
 
 ## Session lifecycle: restart vs refresh
 
-Sessions load `CLAUDE.md`, the SessionStart hook output, and skill files once into
-context at start. Mid-session edits to those do NOT auto-refresh. Other files
-(`brain/`, `STATUS.md`, code) are read on demand and stay fresh.
-
-Mnemonic: **instructions changed = restart. Content changed = refresh** (re-pull +
-re-read, e.g. via a `/catchup` skill).
+Sessions load `CLAUDE.md`, the SessionStart hook output, and skill files once at start.
+Mid-session edits to those do NOT auto-refresh. Other files (`brain/`, `STATUS.md`,
+code) are read on demand and stay fresh.
 
 | What changed | What to do |
 |---|---|
 | `global/CLAUDE.md`, a skill file, the hook script, settings | Restart the affected session(s) |
 | `brain/*.md`, a `STATUS.md`, memory bodies, code | Refresh (`/catchup`) in the affected session(s) |
 
-## SessionStart hook contract
+## Hooks
 
-Hook script: `hooks/session-start.sh`. On every session it:
+Registered by `scripts/install.sh` in `~/.claude/settings.json`. Check 10 asserts they
+stay registered.
 
-1. Locates the spine repo (auto-detects common locations, or honors `LANE_OS_ROOT`).
-2. Pulls the spine repo fast-forward-only (never auto-merges from a hook).
-3. Refreshes the user-level `~/.claude/CLAUDE.md` from `global/CLAUDE.md` (skipped if
-   it is already a symlink).
-4. Symlinks repo skills into `~/.claude/skills/` and prunes links to deleted skills.
-5. Pulls the current code repo too if the session is inside one.
-6. Emits a compact **read-directive** naming the exact files this lane should read.
+| Event | Script | Does |
+|---|---|---|
+| SessionStart | `hooks/session-start.sh` | Locates the spine, pulls, links skills, detects the lane, emits the read-directive, refreshes the switchboard |
+| PreToolUse (Write, Edit, MultiEdit, NotebookEdit) | `scripts/hooks/block-cross-lane-write.py` | The write-lane guard. Exit 2 blocks. Fails open on uncertainty; `LANE_GUARD_OFF=1` disables |
+| Stop | `scripts/hooks/advisory-reply-length.py` | Measures the reply into `outputs/reply-length.jsonl`. Silent |
+| UserPromptSubmit | `scripts/hooks/preflight-reply-length.py` | Instructs before the next reply once the log shows drift |
+| git pre-commit (spine) | installed by `scripts/install-git-hooks.sh` | `audit-cheap.sh --quiet --staged` |
+| git pre-commit (a shared repo) | `scripts/hooks/shared-repo-pre-commit.sh` | Refuses any staged file outside the published manifest |
 
-**Why a directive and not the file contents:** hook stdout is truncated to a small
-inline preview when large; anything past that is written to a file the model does not
-auto-read. So the hook must NOT print full brain/status files. It prints a short,
-always-delivered pointer telling the session to Read those files itself, which
-delivers the full content reliably via the Read tool.
+## The SessionStart directive
 
-The directive is lane-aware: a code lane is told to read its `STATUS.md` + the brain
-priorities; a desk is told to read its own `CLAUDE.md` + `LOG.md`; a spine session
-is told to read the cross-cutting priorities.
+The hook looks at the working directory:
+
+- Inside a git repo that is not the spine: **code lane**, named by the repo folder.
+- Inside `spine/projects/<name>/`: the same **code lane**, addressed by its mirror. Being
+  inside the spine does not make it a spine session.
+- Inside `spine/desks/<topic>/`: **desk**.
+- Anywhere else in the spine: **spine (workspace-root)**.
+
+It then prints the lane's write boundary and the exact files to read, plus a trailer:
+an ACTION line when `brain/drafts/` holds staged files, a NOTE when a pull failed and
+why (behind/ahead), and a SWITCHBOARD pointer. Pointers only: hook stdout truncates to a
+small inline preview, and a dumped file is a silently half-read file.
+
+## Checks (`scripts/audit-cheap.sh`)
+
+| # | Asserts | Backing script |
+|---|---|---|
+| 1 | Backticked repo paths in instruction docs exist | |
+| 2 | Skills are symlinks in `~/.claude/skills` | |
+| 3 | Wikilinks resolve, memory is indexed | `scripts/lane-doctor.sh` |
+| 4 | State files inside their byte budgets | `scripts/check-file-budgets.py` |
+| 5 | `WEEKLY_LOG.md` is a 2-week window | |
+| 6 | No draft older than 7 days | |
+| 7 | Open concerns dated within 30 days | |
+| 8 | Open concerns declare a Probe or an Owner | `scripts/probe-concerns.py --check` |
+| 9 | The write-lane guard blocks | `scripts/test-lanes.sh` |
+| 10 | Every guard hook is registered | |
+| 11 | The commit gate judges only the staged set | `scripts/tests-audit-cheap-staged.sh` |
+| 12 | The coverage line matches the file | `scripts/find-decayed-rules.py --count` |
+| 13 | Shared repos never receive the rules | `scripts/tests-shared-repos-never-sync.py` |
+| 14 | The reply-length pair agrees | both hooks' `--self-test` |
+| 15 | No credential shape in a changed file | |
+
+## Scripts
+
+| Script | Purpose |
+|---|---|
+| `scripts/install.sh` | One-time machine setup, idempotent |
+| `scripts/install-git-hooks.sh` | The pre-commit gate in the spine |
+| `scripts/new-lane.sh code\|desk <name>` | Scaffold a lane |
+| `scripts/lane-doctor.sh` | Dangling wikilinks, unindexed memory |
+| `scripts/audit-cheap.sh` | The 15 drift checks |
+| `scripts/find-decayed-rules.py` | Gated / judgment / untriaged |
+| `scripts/probe-concerns.py` | Run every concern's Probe |
+| `scripts/check-file-budgets.py` | The budget table |
+| `scripts/sync-rules.py` | Constitution into every code lane |
+| `scripts/publish-shared-repo.py <audience>` | A lane's cleared slice into a shared repo |
+| `scripts/build-switchboard.py` | The cross-lane map |
+| `scripts/build-llms-full.sh` | Regenerate `llms-full.txt` from README + docs |
+| `scripts/test-lanes.sh`, `scripts/tests-*.py`, `scripts/tests-*.sh`, `--self-test` flags | Every gate proves it blocks |
+
+## Environment variables
+
+| Variable | Meaning |
+|---|---|
+| `LANE_OS_ROOT` | The spine repo. Auto-detected from common locations when unset |
+| `LANE_OS_WORKSPACE_ROOTS` | Colon-separated dirs holding code repos (default `~/repos:~/work`); overrides `workspace.toml` |
+| `LANE_OS_LONG_FORM_DESKS` | Comma-separated desks where a long reply is correct |
+| `LANE_OS_HUMAN` | The Owner name that means "a decision only the human can make" (default `you`) |
+| `LANE_GUARD_OFF=1` | Disable the write-lane guard for one session |
+| `REPLY_LENGTH_ADVISORY=1` | Make the Stop half of the reply-length pair print its findings |
+| `LANE_OS_SHARED_TARGET` | Override the publisher's target checkout |
 
 ## Symlink architecture
 
-The spine repo is the single source of truth. Symlinks make sure edits land in it
-with no drift:
-
-- `~/.claude/CLAUDE.md` -> `<spine>/global/CLAUDE.md`
-- `~/.claude/skills/<name>` -> `<spine>/skills/<name>` (one per skill; the hook keeps
-  these current automatically)
-- `~/.claude/hooks/session-start.sh` -> `<spine>/hooks/session-start.sh`
-
-Keep these as symlinks, never copies: a copy goes stale silently and is the classic
-cause of "the hook is not picking up my change."
-
-## Multi-machine sync
-
-`git pull` the spine repo. Brain files, statuses, global config, and skills all come
-with it. Code syncs through each repo. No dual-write once symlinks are in place.
-
-If a push is rejected, `git pull --rebase` and retry. On a merge conflict, surface it
-rather than resolving blind.
+The spine repo is the single source of truth. Symlinks make sure edits land in it with
+no drift: `~/.claude/CLAUDE.md` -> `<spine>/global/CLAUDE.md`, `~/.claude/skills/<name>`
+-> `<spine>/skills/<name>`, `~/.claude/hooks/session-start.sh` ->
+`<spine>/hooks/session-start.sh`. Keep them as symlinks, never copies.
 
 ## Onboarding a new lane
 
-- **New code lane:** create `projects/<repo-name>/` in the spine (copy
-  `projects/_TEMPLATE/`). The hook keys context injection on the repo's folder name,
-  so the names must match.
-- **New desk:** copy `desks/_TEMPLATE/` to `desks/<topic>/` and fill its `CLAUDE.md`.
-- `scripts/new-lane.sh` does either for you.
+- **New code lane:** `scripts/new-lane.sh code <repo-name>`, and add a `[[repos]]` entry
+  to `workspace.toml` so the rules sync reaches it. The mirror folder and the repo
+  folder must share a name.
+- **New desk:** `scripts/new-lane.sh desk <topic>` and fill its `CLAUDE.md`.
+- **New shared repo:** add an audience to `AUDIENCES` in `scripts/publish-shared-repo.py`.
+  The sync denies it from that moment; Check 13 proves it.

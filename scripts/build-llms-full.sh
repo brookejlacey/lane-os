@@ -12,6 +12,16 @@ ORDER=(
   docs/architecture.md
   docs/write-lane-invariant.md
   docs/session-lifecycle.md
+  docs/gated-rules.md
+  docs/miss-to-rule-loop.md
+  docs/concerns.md
+  docs/context-budgets.md
+  docs/drift-checks.md
+  docs/reply-length-gate.md
+  docs/agent-toward-human.md
+  docs/switchboard.md
+  docs/rules-sync-and-shared-repos.md
+  docs/parallel-lanes-worktrees.md
   docs/memory.md
   docs/multi-machine.md
   docs/code-from-anywhere.md

@@ -31,6 +31,15 @@ The hook and guard locate the spine via `LANE_OS_ROOT` first, then a list of com
 locations. If your spine lives somewhere unusual on a given machine, set
 `LANE_OS_ROOT` in that machine's shell profile and everything else follows.
 
+## The rules reach every code lane too
+
+Symlinks cover the machines you configured. `python3 scripts/sync-rules.py` covers the
+rest: it writes the constitution into each code lane's `.claude/global-rules.md` and
+`AGENTS.md`, so a standalone clone, a remote host or a cloud-style task in that repo
+reads the same rules. It defers the commit in a repo with a session open and never
+touches a repo an outside reader sees. See
+[`rules-sync-and-shared-repos.md`](rules-sync-and-shared-repos.md).
+
 ## Remote / always-on hosts (code from anywhere)
 
 You can run always-on sessions on a machine you leave on and drive them from your phone

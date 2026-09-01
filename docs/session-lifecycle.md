@@ -20,11 +20,15 @@ re-reads it without losing your session history.
 `hooks/session-start.sh` runs on every session start. It:
 
 1. Locates the spine repo (via `LANE_OS_ROOT` or auto-detection).
-2. Pulls the spine fast-forward-only.
+2. Pulls the spine fast-forward-only, and records why if that fails (behind/ahead, or offline).
 3. Refreshes `~/.claude/CLAUDE.md` from the constitution (unless it is a symlink).
 4. Symlinks skills into `~/.claude/skills/` and prunes dead links.
 5. Pulls the current code repo if the session is in one.
-6. Emits a compact, lane-aware **read-directive**.
+6. Detects the lane: code repo, code lane from its `projects/<name>/` mirror, desk, or spine.
+7. Emits a compact, lane-aware **read-directive**, plus a trailer: an ACTION line when
+   `brain/drafts/` holds staged files, any pull failure, and a SWITCHBOARD pointer with
+   the lane count and build time.
+8. Refreshes the switchboard in the background.
 
 ## Why a directive, not the file contents
 
@@ -41,9 +45,29 @@ delivers the full content reliably. The directive is phrased as blocking ("Read 
 before your first reply") because the observed failure mode is a session answering
 from the index alone instead of opening the files.
 
+The same reasoning is why the files it points at carry byte budgets
+([`context-budgets.md`](context-budgets.md)): a pointer to a 30k file is a 30k cost paid
+by every session before it is asked anything.
+
+## The other hooks in a session
+
+| Event | Hook | Does |
+|---|---|---|
+| PreToolUse | `scripts/hooks/block-cross-lane-write.py` | Blocks an out-of-lane write |
+| UserPromptSubmit | `scripts/hooks/preflight-reply-length.py` | One line of context before the reply, only when recent replies drifted long |
+| Stop | `scripts/hooks/advisory-reply-length.py` | Measures the reply into a local log; silent |
+
+`scripts/install.sh` registers all of them. See [`reply-length-gate.md`](reply-length-gate.md).
+
+## What a spine session does at sit-down
+
+`/orient` (or `/catchup`): pull, re-read `ACTIVE_NOW` and `CONCERNS`, merge
+`brain/drafts/` into the right files, run `scripts/probe-concerns.py` so open concerns are
+probed rather than re-dated, and, if the constitution changed, `scripts/sync-rules.py`.
+`bash scripts/audit-cheap.sh` before the commit catches what that pass missed.
+
 ## Refreshing a long-running or remote session
 
-If you drive a session over remote control and cannot restart it easily, a
-`/catchup`-style skill re-pulls and re-reads content. Note that it does not reload the
-constitution or skills, which bind at process start; for those, a real restart is the
-only guarantee.
+If you drive a session over remote control and cannot restart it easily, `/catchup`
+re-pulls and re-reads content. It does not reload the constitution or skills, which bind
+at process start; for those, a real restart is the only guarantee.

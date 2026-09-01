@@ -8,70 +8,95 @@ FILE: README.md
 
 # Lane OS
 
-**A multi-session operating system for [Claude Code](https://docs.claude.com/en/docs/claude-code/overview): parallel, single-topic lanes over a shared, persistent context spine.**
+**A multi-session operating system for [Claude Code](https://docs.claude.com/en/docs/claude-code/overview): parallel, single-topic lanes over a shared, persistent context spine, with the rules that govern it enforced by hooks and commit checks instead of remembered.**
 
-Lane OS is a repository layout plus a small set of hooks, skills, and conventions that let you run many AI coding sessions at once without them stepping on each other, and without re-explaining your world at the start of every session.
+Lane OS is a repository layout plus a small set of hooks, checks, skills and conventions that let you run many AI coding sessions at once without them stepping on each other, without re-explaining your world at the start of every session, and without the rules you gave the agent quietly decaying over months.
 
-It solves two problems that show up the moment you take agentic coding seriously:
+It solves three problems that show up the moment you take agentic coding seriously:
 
-1. **Parallel sessions clobber shared state.** If three sessions all try to update the same "what am I working on" files, they conflict on git and the whole thing collapses into merge hell.
-2. **Every new session starts amnesiac.** Without a durable context layer, you paste the same background into chat over and over, and the agent still guesses.
+1. **Parallel sessions clobber shared state.** Three sessions updating the same "what am I working on" files conflict on git and the whole thing collapses into merge hell.
+2. **Every new session starts amnesiac.** Without a durable context layer you paste the same background into chat over and over, and the agent still guesses.
+3. **Rules held only in prose decay.** A preference you stated in June is gone by August, not because anyone deleted it, but because nothing checked it. Measured in the spine this came from: the two context files with a byte ceiling stayed flat over four months; the two governed only by a written brevity rule grew 2x and 5.2x.
 
-Lane OS fixes both with one idea: **one window = one topic**, and every window may only write to the lane it owns.
-
----
-
-## The core idea
-
-You run work in **lanes**. A lane is one window (one session) scoped to one topic. There are three kinds:
-
-| Lane type | What it is | Where it writes |
-|---|---|---|
-| **Code lane** | A product/code repository | Its own repo, plus a small status mirror in the spine |
-| **Topic desk** | An ongoing non-code subject (finances, planning, research) | `desks/<topic>/` only |
-| **The spine** | Your cross-cutting context (identity, priorities, memory) | `brain/`, `memory/`, `global/`, `skills/` |
-
-All three share one **spine repo**: a single git repository holding your context layer (`brain/`), your durable memory (`memory/`), your global rules (`global/`), your reusable skills (`skills/`), and a thin status mirror of every code lane (`projects/`).
-
-The rule that makes parallelism safe is the **write-lane invariant**: a session may write only to the lane it owns. A code-lane session never edits the spine. A desk session never edits another desk. Only a spine session rebuilds the cross-cutting files. This is enforced two ways: a `SessionStart` hook that tells each session its lane and boundaries, and a `PreToolUse` guard that blocks out-of-lane writes at the keystroke.
-
-See [`docs/write-lane-invariant.md`](docs/write-lane-invariant.md) for the full rule and why it is structural, not a preference.
+One idea handles the first two: **one window = one topic**, and every window may only write to the lane it owns. One idea handles the third: **a rule either names the gate that enforces it, or it is recorded as judgment with the reason**, and the coverage ratio is measured from the file on every commit.
 
 ---
 
 ## What you get
 
+Ordered by what is hardest to find elsewhere.
+
+### 1. Concerns that declare how they close
+
+`brain/CONCERNS.md` holds the open unknowns. Every item declares a **Probe** (a shell command the machine runs on a schedule, printing `CLOSED`, `OPEN` or `UNKNOWN`) or an **Owner** (the one human or lane who can close it, because no command can observe the closing event). `scripts/probe-concerns.py` runs the probes, stamps the results and sorts the file into READY TO CLOSE, DECISIONS OWED and OWNED WORK. A probe never closes an item on its own; it flags, a human confirms. A concern that declares neither fails the commit. [`docs/concerns.md`](docs/concerns.md)
+
+### 2. The miss-to-rule-plus-check loop, with a gated-coverage ratchet
+
+A found miss gets the instance fixed, the rule written with its scar attached, a gate wired when the signature is deterministic, and the rule bullet naming the gate. `/reflect implement` runs that loop from a session's learnings. The constitution opens with `Coverage today: N of M bullets are gated`; that number is measured by `scripts/find-decayed-rules.py`, rules with no deterministic signature are triaged in `global/rule-triage.tsv` with the reason, and Check 12 fails the commit when the claim and the file disagree. The decay surface is a list you work down, not a thing you rediscover one embarrassment at a time. [`docs/gated-rules.md`](docs/gated-rules.md), [`docs/miss-to-rule-loop.md`](docs/miss-to-rule-loop.md)
+
+### 3. The write-lane invariant
+
+A session may write only to the lane it owns plus the shared inbox `brain/drafts/`. A code lane writes its repo and its `projects/<name>/` mirror; a desk writes its `desks/<topic>/`; only a spine session rebuilds the cross-cutting files. A `PreToolUse` guard blocks out-of-lane writes at the keystroke, a SessionStart directive tells each session its boundary, and because a fail-open guard cannot report its own death, `scripts/test-lanes.sh` feeds it 25 representative writes on every commit and asserts it still blocks. [`docs/write-lane-invariant.md`](docs/write-lane-invariant.md)
+
+### 4. Byte budgets on context files
+
+Every file a session reads whole carries a budget in one table, `scripts/check-file-budgets.py`: hard ceilings for the four always-loaded files, warn-only for everything else, the four summed as their own row, and a code lane's own `CLAUDE.md`, `BACKLOG.md` and `DECISIONS.md` (above its `## Archive` divider) from the same table. Prune before you add; move history to an archive file verbatim. [`docs/context-budgets.md`](docs/context-budgets.md)
+
+### 5. A synthesis layer above the codebase
+
+`brain/` holds what no single repo can: who you are, what is live right now across every lane, the decisions and their reasoning, the open concerns, the people, a two-week log. Code lanes mirror a thin `STATUS.md` and `MEMORY.md` into `projects/`, and a spine session rebuilds the brain from those plus the drafts every lane may stage. `memory/` holds durable facts one per file. The switchboard shows what every other window is doing and what it is currently on, so a session asks the neighbouring lane instead of re-deriving its work. [`docs/architecture.md`](docs/architecture.md), [`docs/switchboard.md`](docs/switchboard.md)
+
+### 6. Behavioural rules for the agent toward the human
+
+The constitution carries rules for the reply, not only the code: a reply is ten lines or fewer, finished work is reported in a five-line envelope, a miss gets the corrected fact and no apology, nothing gets sized or clocked. The reply cap is gated by a pair of hooks: a Stop hook that only measures, and a UserPromptSubmit hook that instructs before the next reply once the log shows drift, so a well-behaved session pays nothing. The rest are recorded as judgment, honestly, with the reason no detector can exist. [`docs/agent-toward-human.md`](docs/agent-toward-human.md), [`docs/reply-length-gate.md`](docs/reply-length-gate.md)
+
+### Also in the box
+
+- **The session-start pointer hook.** Detects the lane from the working directory, pulls, and injects a compact read-directive naming the exact files to read, never their contents (hook stdout truncates; a dumped file is a silently half-read file). [`docs/session-lifecycle.md`](docs/session-lifecycle.md)
+- **`audit-cheap.sh`**, fifteen sub-second drift checks wired into a pre-commit hook that judges only the staged set, so parallel sessions in one checkout do not fail each other's commits. [`docs/drift-checks.md`](docs/drift-checks.md)
+- **The rules sync** that propagates the constitution into every code lane, defers the commit in a repo with a live session (writes are safe, the git index is not), and can never write into a repo published to an outside reader, because its deny list derives from the publisher's own audience table. **The shared-repo publisher** with per-audience allow and deny lists, a fail-closed content scrub, an allowlisted commit and a second lock installed in the target. [`docs/rules-sync-and-shared-repos.md`](docs/rules-sync-and-shared-repos.md)
+- **`/preflight` and `/ship`**, the open and close of a build: five gates, a blind-spot pass, a bounded interview, a plan ordered by what will change, a deviation log the build writes into and the ship step folds into an honest Verified / Code-shipped / Inferred report.
+- **Worktree guidance** for two sessions in one lane, and what a driven session does to your git index. [`docs/parallel-lanes-worktrees.md`](docs/parallel-lanes-worktrees.md)
+- **Code from anywhere**: always-on remote-control sessions, one per lane, driven from a phone with the full filesystem. [`docs/code-from-anywhere.md`](docs/code-from-anywhere.md)
+
+---
+
+## The layout
+
 ```
 lane-os/
 ├── global/
-│   ├── CLAUDE.md          # the constitution: behavioral rules loaded every session
-│   └── REFERENCE.md       # read-on-demand setup + architecture notes
-├── brain/                 # the context spine (state files, rebuilt by spine sessions)
-│   ├── WHO_I_AM.md        # identity, season, working style
-│   ├── ACTIVE_NOW.md      # what is live right now, ordered by category
-│   ├── DECISIONS.md       # recent decisions + reasoning
-│   ├── CONCERNS.md        # open loops and worries
-│   ├── PEOPLE.md          # collaborators, relationships
-│   ├── WEEKLY_LOG.md      # rolling 2-week log
-│   └── drafts/            # the one path EVERY lane may write (staging for merge)
-├── memory/                # durable facts, one file per fact, frontmatter-indexed
-│   ├── MEMORY.md          # the index loaded each session
-│   └── README.md          # frontmatter schema + conventions
-├── projects/              # thin status mirror of each code lane
-│   └── _TEMPLATE/         # STATUS.md + MEMORY.md to copy per code lane
-├── desks/                 # topic desks
-│   └── _TEMPLATE/         # CLAUDE.md + LOG.md to copy per desk
-├── skills/                # lifecycle slash-commands (orient, catchup, today, spark, ...)
-├── hooks/
-│   └── session-start.sh   # detects the lane, pulls, injects a read-directive
+│   ├── CLAUDE.md              # the constitution, opens with its own gated-coverage count
+│   ├── rule-triage.tsv        # rules that genuinely cannot be gated, with the reason
+│   └── REFERENCE.md           # read-on-demand: hooks, checks, scripts, routing
+├── brain/                     # the synthesis layer (state files, rebuilt by spine sessions)
+│   ├── ACTIVE_NOW.md  CONCERNS.md  DECISIONS.md  PEOPLE.md  WEEKLY_LOG.md  WHO_I_AM.md
+│   └── drafts/                # the one path EVERY lane may write
+├── memory/                    # durable facts, one file per fact, indexed by MEMORY.md
+├── projects/_TEMPLATE/        # STATUS.md + MEMORY.md mirror, one per code lane
+├── desks/_TEMPLATE/           # CLAUDE.md + LOG.md, one per topic desk
+├── skills/                    # orient, catchup, today, week, since, spark, spin-lane, recall,
+│                              # reflect (+ implement mode), preflight, ship
+├── hooks/session-start.sh     # detects the lane, pulls, injects the read-directive
 ├── scripts/
 │   ├── hooks/
-│   │   └── block-cross-lane-write.py   # PreToolUse guard enforcing the invariant
-│   ├── new-lane.sh        # scaffold a new code lane or desk
-│   ├── build-switchboard.py            # cross-lane awareness cache
-│   ├── install.sh         # one-time machine setup (symlinks, hook registration)
-│   └── remote/            # always-on hosts: code from your phone, non-sandbox
-└── switchboard/           # local, gitignored cache of what moved in other lanes
+│   │   ├── block-cross-lane-write.py    # PreToolUse: the write-lane guard
+│   │   ├── advisory-reply-length.py     # Stop: measures the reply, silent
+│   │   ├── preflight-reply-length.py    # UserPromptSubmit: instructs on drift
+│   │   └── shared-repo-pre-commit.sh    # the second lock inside a shared repo
+│   ├── audit-cheap.sh         # 15 drift checks; the pre-commit gate runs it --staged
+│   ├── find-decayed-rules.py  # gated / judgment / untriaged, the coverage ratchet
+│   ├── probe-concerns.py      # runs every concern's Probe, stamps the result
+│   ├── check-file-budgets.py  # the one budget table
+│   ├── sync-rules.py          # constitution -> every code lane, live-session and shared-repo safe
+│   ├── publish-shared-repo.py # a lane's cleared slice -> a repo an outside reader sees
+│   ├── build-switchboard.py   # what every other lane is doing, and what it is on
+│   ├── workspace_lib.py       # manifest, repo discovery, the derived deny list, live sessions
+│   ├── install.sh  install-git-hooks.sh  new-lane.sh  lane-doctor.sh  build-llms-full.sh
+│   ├── test-lanes.sh  tests-*.py  tests-*.sh     # every gate proves it blocks
+│   └── remote/                # always-on hosts for code-from-anywhere
+├── workspace.toml             # your workspace roots and code lanes
+└── switchboard/               # local, gitignored: SWITCHBOARD.html + state.json
 ```
 
 ---
@@ -83,55 +108,58 @@ lane-os/
 git clone https://github.com/<you>/lane-os.git ~/work/spine
 cd ~/work/spine
 
-# 2. Run the installer: symlinks global/CLAUDE.md into ~/.claude,
-#    links skills, and registers the SessionStart + PreToolUse hooks.
+# 2. Install: symlinks global/CLAUDE.md into ~/.claude, links skills, registers the
+#    SessionStart, PreToolUse, Stop and UserPromptSubmit hooks, installs the commit gate.
 bash scripts/install.sh
 
 # 3. Fill in your spine. These are templates; make them yours.
-$EDITOR brain/WHO_I_AM.md brain/ACTIVE_NOW.md
+$EDITOR brain/WHO_I_AM.md brain/ACTIVE_NOW.md brain/CONCERNS.md workspace.toml
 
-# 4. Open a session here (the spine / workspace-root session) and try:
-#    /orient    -> your daily sit-down
-#    /spark     -> capture an idea from any lane without losing focus
+# 4. Prove the gates are live, then open a spine session and try /orient.
+bash scripts/audit-cheap.sh
 ```
 
-To start a **code lane**, point a session at any code repo on your machine and add a `projects/<repo-name>/` folder in the spine (copy `projects/_TEMPLATE/`). To start a **desk**, copy `desks/_TEMPLATE/` to `desks/<topic>/`. The `scripts/new-lane.sh` helper does both.
-
----
-
-## Code from anywhere, without a sandbox
-
-Once your lanes exist, you can drive **real, full-filesystem sessions from your phone or any laptop**, against your actual repos with your real secrets and tools, by keeping a few always-on `claude remote-control` sessions on one machine you leave on. One host per lane means each one boots already scoped to the right context and write boundary. This is the opposite of the in-app sandbox (single repo, no secrets, pull-request only). See [`docs/code-from-anywhere.md`](docs/code-from-anywhere.md) and [`scripts/remote/`](scripts/remote/).
+To start a **code lane**, `scripts/new-lane.sh code <repo-name>` and open a session in that repo. To start a **desk**, `scripts/new-lane.sh desk <topic>`. After you edit the constitution, `python3 scripts/sync-rules.py` carries it into every code lane. [`docs/getting-started.md`](docs/getting-started.md)
 
 ---
 
 ## Why a spine instead of one giant CLAUDE.md
 
-A single ever-growing instruction file gets loaded in full on every session, gets expensive, and still does not hold the state that actually changes day to day. Lane OS splits the two:
-
-- **Rules that rarely change** live in `global/CLAUDE.md` (the constitution) and load every session.
-- **State that changes constantly** lives in `brain/` and `memory/`, and is *read on demand* via a compact pointer the hook injects, never pasted wholesale.
-
-This keeps the always-loaded payload small while giving every session reliable access to the full, current picture. See [`docs/session-lifecycle.md`](docs/session-lifecycle.md).
+A single ever-growing instruction file loads in full on every session, gets expensive, and still does not hold the state that changes day to day. Lane OS splits the two: rules that rarely change live in `global/CLAUDE.md` and load every session, under a byte ceiling; state that changes constantly lives in `brain/` and `memory/` and is read on demand via a compact pointer the hook injects, never pasted wholesale. And because a rule that is merely loaded still decays, the ones with a deterministic signature are enforced by a hook or a check that names itself on the rule.
 
 ---
 
 ## Documentation
 
-- [`docs/philosophy.md`](docs/philosophy.md) - one window = one topic, and why
-- [`docs/architecture.md`](docs/architecture.md) - the three lane types and the spine in detail
-- [`docs/write-lane-invariant.md`](docs/write-lane-invariant.md) - the safety rule that makes parallelism work
-- [`docs/session-lifecycle.md`](docs/session-lifecycle.md) - the SessionStart hook, restart vs refresh
-- [`docs/memory.md`](docs/memory.md) - the durable-facts memory system
-- [`docs/multi-machine.md`](docs/multi-machine.md) - symlinks, sync, working across machines
-- [`docs/code-from-anywhere.md`](docs/code-from-anywhere.md) - drive real, non-sandbox sessions from your phone or any laptop
-- [`docs/getting-started.md`](docs/getting-started.md) - adopt it step by step
+- [`docs/philosophy.md`](docs/philosophy.md), one window = one topic, and why
+- [`docs/architecture.md`](docs/architecture.md), the three lane types and the spine
+- [`docs/write-lane-invariant.md`](docs/write-lane-invariant.md), the safety rule that makes parallelism work
+- [`docs/session-lifecycle.md`](docs/session-lifecycle.md), the SessionStart hook, restart vs refresh
+- [`docs/gated-rules.md`](docs/gated-rules.md), gated or judgment, and the coverage ratchet
+- [`docs/miss-to-rule-loop.md`](docs/miss-to-rule-loop.md), what a miss turns into
+- [`docs/concerns.md`](docs/concerns.md), Probe or Owner
+- [`docs/context-budgets.md`](docs/context-budgets.md), the one budget table
+- [`docs/drift-checks.md`](docs/drift-checks.md), audit-cheap and the staged commit gate
+- [`docs/reply-length-gate.md`](docs/reply-length-gate.md), measure after, instruct before
+- [`docs/agent-toward-human.md`](docs/agent-toward-human.md), the behavioural rules
+- [`docs/switchboard.md`](docs/switchboard.md), what the other windows are doing
+- [`docs/rules-sync-and-shared-repos.md`](docs/rules-sync-and-shared-repos.md), propagation, and repos an outside reader sees
+- [`docs/parallel-lanes-worktrees.md`](docs/parallel-lanes-worktrees.md), two sessions in one lane
+- [`docs/memory.md`](docs/memory.md), the durable-facts memory system
+- [`docs/multi-machine.md`](docs/multi-machine.md), symlinks, sync, working across machines
+- [`docs/code-from-anywhere.md`](docs/code-from-anywhere.md), real sessions from your phone
+- [`docs/getting-started.md`](docs/getting-started.md), adopt it step by step
+- [`llms.txt`](llms.txt), the documentation map for pointing an agent at this repo in one paste; [`llms-full.txt`](llms-full.txt) is the whole doc set in one fetchable file
 
 ---
 
+## What lane-os does not do
+
+Lane OS has no app-driving verification CLI and no feature map per product repo. `/ship` runs the gates a project already declares in its own `TESTING.md` and composes the verification skills your agent already has, but nothing here launches your app, walks its features and reports which ones still work. That is the complementary piece, and [pstack](https://github.com/poteto/pstack)'s verification skill is built exactly for it: one skill, one repo, a feature map the agent verifies against. Lane OS is the layer above the codebase; pair it with something like that inside each one.
+
 ## Status
 
-Lane OS is a scaffold, not a framework. There is nothing to install as a dependency and nothing to import. You clone it, make it yours, and the conventions do the work. Fork it, gut it, rename everything. The value is the shape, not the code.
+Lane OS is a scaffold, not a framework. There is nothing to install as a dependency and nothing to import. You clone it, make it yours, and the conventions and the checks do the work. Fork it, gut it, rename everything. The value is the shape, and the fact that the shape is checked.
 
 ## License
 
@@ -190,51 +218,71 @@ FILE: docs/architecture.md
 
 One git repository is the spine. It holds everything cross-cutting:
 
-- `global/` - the constitution (`CLAUDE.md`) and read-on-demand `REFERENCE.md`.
-- `brain/` - the context layer: identity, current priorities, decisions, concerns,
-  people, a rolling log. These are short state files, rebuilt by spine sessions.
-- `memory/` - durable facts, one per file, indexed by `MEMORY.md`.
-- `skills/` - reusable slash-commands.
-- `projects/` - a thin STATUS + MEMORY mirror for each code lane.
-- `desks/` - one folder per topic desk.
+- `global/`: the constitution (`CLAUDE.md`), the judgment triage (`rule-triage.tsv`),
+  and the read-on-demand `REFERENCE.md`.
+- `brain/`: the synthesis layer: identity, current priorities, decisions, concerns,
+  people, a rolling log. Short state files, rebuilt by spine sessions from the lanes'
+  mirrors and the drafts every lane may stage.
+- `memory/`: durable facts, one per file, indexed by `MEMORY.md`.
+- `skills/`: reusable slash-commands.
+- `projects/`: a thin `STATUS.md` + `MEMORY.md` mirror for each code lane.
+- `desks/`: one folder per topic desk.
+- `scripts/` and `hooks/`: the mechanisms that enforce all of the above.
+- `switchboard/`: a local, gitignored map of what every lane is doing.
 
 The spine is private in a real deployment. This public repo is the generic template.
 
 ## Code lanes
 
-A code lane is one of your actual code repositories, anywhere on disk. The spine holds
-only a thin mirror at `projects/<repo-name>/` (a `STATUS.md` and a `MEMORY.md`). The
-repo's folder name and the mirror folder name must match, because the SessionStart
-hook keys context injection on the name.
+A code lane is one of your actual code repositories, anywhere under a workspace root.
+The spine holds only a thin mirror at `projects/<repo-name>/`: a `STATUS.md` (session
+state, goes stale by design) and a `MEMORY.md` (durable facts about the lane, outranks
+STATUS when they disagree). The repo folder and the mirror folder share a name, because
+the hook and the guard key on it.
 
-A code-lane session writes its own repo and its own mirror. That is the carve-out that
-lets a code session record its state without reaching into the spine's brain files.
+A code-lane session writes its own repo and its own mirror. Opening a terminal in the
+mirror (`projects/<name>/`) is the same lane, addressed from the spine side; it does not
+become a spine session by being inside the spine.
+
+The lane's own `CLAUDE.md` holds mechanism only (commands, gotchas, hard rules) and
+imports the synced constitution. Release state lives in the mirror, not the repo.
 
 ## Topic desks
 
-A desk is an ongoing non-code subject: finances, planning, research, a reading queue,
-anything you return to repeatedly that is not a codebase. Each desk is
-`desks/<topic>/` with its own `CLAUDE.md` (its contract and posture) and `LOG.md` (its
-running record). A desk session reads its own `CLAUDE.md` first and works from its
-slice; it does not load the whole brain.
+A desk is an ongoing non-code subject: finances, research, a reading queue, anything
+you return to repeatedly that is not a codebase. Each desk is `desks/<topic>/` with its
+own `CLAUDE.md` (its contract and posture) and `LOG.md` (its running record). A desk
+session reads its own `CLAUDE.md` first and works from its slice; it does not load the
+whole brain.
 
 ## Why mirror code lanes instead of putting status in the repo
 
-Two reasons. First, it keeps all of your cross-project state in one place (the spine),
-so a spine session can synthesize across everything without cloning every repo.
-Second, it keeps private working notes out of code repos that might be public or
-shared. The code lives in the repo; the running commentary lives in the mirror.
+Two reasons. First, it keeps all of your cross-project state in one place, so a spine
+session can synthesize across everything without cloning every repo, and the switchboard
+can read what each lane is on. Second, it keeps private working notes out of code repos
+that might be public or shared. The code lives in the repo; the running commentary lives
+in the mirror.
 
 ## How a session knows which lane it is in
 
 The SessionStart hook looks at the working directory:
 
-- Inside a git repo that is not the spine -> **code lane** (named by the repo folder).
-- Inside `spine/desks/<topic>/` -> **desk**.
-- Inside the spine but not under `desks/` -> **spine (workspace-root)**.
+- Inside a git repo that is not the spine: **code lane** (named by the repo folder).
+- Inside `spine/projects/<name>/`: the same **code lane**, from the mirror.
+- Inside `spine/desks/<topic>/`: **desk**.
+- Inside the spine otherwise: **spine (workspace-root)**.
 
 It then injects a directive naming that lane's write boundary and the exact files to
-read. See `docs/session-lifecycle.md`.
+read. See `docs/session-lifecycle.md`. The guard makes the same classification from the
+same rule, and `scripts/test-lanes.sh` asserts the two agree on 25 representative writes.
+
+## The read side: the switchboard
+
+Lanes never write each other. They do read each other, through `switchboard/`: a
+per-machine map built by `scripts/build-switchboard.py` with each lane's last human
+commit and its current `focus` (the newest dated heading in its STATUS or LOG). A session
+that finds overlap with a neighbour's focus messages that lane, or drives it, instead of
+re-deriving its work. See `docs/switchboard.md`.
 
 
 ================================================================
@@ -252,9 +300,11 @@ preference: break it and parallel sessions corrupt each other's state.
 
 | Session lane | May write | May NOT write |
 |---|---|---|
-| Code lane | its own repo, `projects/<name>/`, `brain/drafts/` | the rest of the spine, other repos |
+| Code lane (cwd is the repo, or `projects/<name>/`) | its own repo, `projects/<name>/`, `brain/drafts/` | the rest of the spine, other repos, other mirrors |
 | Desk | its own `desks/<topic>/`, `brain/drafts/` | the rest of the spine, other desks, repos |
-| Spine (workspace-root) | the whole spine | another repo's code |
+| Spine (workspace-root) | the whole spine, `~/.claude` | another repo's code |
+
+Scratch under `/tmp` is nobody's lane and is always allowed.
 
 ## Why it has to be a hard rule
 
@@ -274,12 +324,29 @@ might know a true, important fact about your week, but if it writes that into
 1. **The SessionStart directive** tells every session its lane and its boundary, in
    plain language, before it does anything.
 2. **The PreToolUse guard** (`scripts/hooks/block-cross-lane-write.py`) resolves every
-   write target against the session's lane and hard-blocks out-of-lane writes. Wrong
-   lane work becomes impossible, not just discouraged.
+   write target against the session's lane and hard-blocks out-of-lane writes (exit 2).
+   Wrong-lane work becomes impossible, not just discouraged.
+3. **The test that proves the guard blocks** (`scripts/test-lanes.sh`) runs on every
+   commit as `audit-cheap` Check 9.
 
-The guard fails open: if it cannot confidently identify a violation, it allows the
-write. It also cannot see writes made through Bash redirection, so the routing
-reflex (open the window that owns the work) still matters.
+The third is not optional. The guard fails open: if it cannot confidently identify a
+violation, it allows the write, because a false block stops real work. That means a
+broken guard and an approving guard are byte-identical from outside. In the spine this
+came from, the guard approved every write for weeks behind a bare `except` before a
+staged draft's claim about a specific hole was probed and the probe showed the guard
+also failed its own docstring's example. So the test feeds it 25 representative writes,
+in both directions (over-blocking is its own outage), and the commit gate runs it.
+
+The guard also cannot see writes made through Bash redirection, so the routing reflex
+(open the window that owns the work) still matters.
+
+## The mirror is the lane
+
+Opening a terminal in `projects/<name>/` means "I am working that lane", not "I own the
+spine". Before the guard classified it that way, cd-ing one level deeper into the spine
+silently bought write access to `memory/`, `global/`, `skills/` and `brain/`. Both the
+hook and the guard now treat that cwd as the code lane: it may write the mirror, the
+repo of the same name under a workspace root, and `brain/drafts/`.
 
 ## When asked to write out of lane
 
@@ -288,11 +355,33 @@ Decline and redirect BEFORE the write, never comply then apologize. Two redirect
 - "Open a spine session and ask again there," or
 - "I will stage this in `brain/drafts/` for the next merge."
 
+And a third option that is not a write at all: **a lane you cannot write is still a lane
+you can drive.** `cd <repo> && claude -p "<goal>"` runs a session in the right lane from
+where you are. Hand the human the window only when a session already works there.
+
+## Same lane, two sessions
+
+The guard stops cross-lane writes. It does not stop two sessions in the same lane
+sharing one checkout, and that collision is real. See
+[`parallel-lanes-worktrees.md`](parallel-lanes-worktrees.md).
+
 ## The escape hatch
 
 Set `LANE_GUARD_OFF=1` to disable the guard for a session where you are deliberately
-doing cross-lane setup (for example, bootstrapping a brand new repo). Use it
-knowingly.
+doing cross-lane setup (for example, bootstrapping a brand new repo). Use it knowingly.
+
+## Verifying the guard
+
+```bash
+bash scripts/test-lanes.sh
+```
+
+It pins `LANE_OS_ROOT` and `LANE_OS_WORKSPACE_ROOTS` to deterministic locations, stands
+up throwaway git repos to play code lanes (the guard resolves a code lane with real
+`git rev-parse`), and checks the exit code for each case: the drafts inbox from every
+lane, the spine's own files and agent config, a code lane's repo, mirror, relative path
+and scratch, the mirror-as-cwd cases, a desk's own files, and every cross-lane write
+that must be refused. Exit 1 on any failure.
 
 
 ================================================================
@@ -321,11 +410,15 @@ re-reads it without losing your session history.
 `hooks/session-start.sh` runs on every session start. It:
 
 1. Locates the spine repo (via `LANE_OS_ROOT` or auto-detection).
-2. Pulls the spine fast-forward-only.
+2. Pulls the spine fast-forward-only, and records why if that fails (behind/ahead, or offline).
 3. Refreshes `~/.claude/CLAUDE.md` from the constitution (unless it is a symlink).
 4. Symlinks skills into `~/.claude/skills/` and prunes dead links.
 5. Pulls the current code repo if the session is in one.
-6. Emits a compact, lane-aware **read-directive**.
+6. Detects the lane: code repo, code lane from its `projects/<name>/` mirror, desk, or spine.
+7. Emits a compact, lane-aware **read-directive**, plus a trailer: an ACTION line when
+   `brain/drafts/` holds staged files, any pull failure, and a SWITCHBOARD pointer with
+   the lane count and build time.
+8. Refreshes the switchboard in the background.
 
 ## Why a directive, not the file contents
 
@@ -342,12 +435,727 @@ delivers the full content reliably. The directive is phrased as blocking ("Read 
 before your first reply") because the observed failure mode is a session answering
 from the index alone instead of opening the files.
 
+The same reasoning is why the files it points at carry byte budgets
+([`context-budgets.md`](context-budgets.md)): a pointer to a 30k file is a 30k cost paid
+by every session before it is asked anything.
+
+## The other hooks in a session
+
+| Event | Hook | Does |
+|---|---|---|
+| PreToolUse | `scripts/hooks/block-cross-lane-write.py` | Blocks an out-of-lane write |
+| UserPromptSubmit | `scripts/hooks/preflight-reply-length.py` | One line of context before the reply, only when recent replies drifted long |
+| Stop | `scripts/hooks/advisory-reply-length.py` | Measures the reply into a local log; silent |
+
+`scripts/install.sh` registers all of them. See [`reply-length-gate.md`](reply-length-gate.md).
+
+## What a spine session does at sit-down
+
+`/orient` (or `/catchup`): pull, re-read `ACTIVE_NOW` and `CONCERNS`, merge
+`brain/drafts/` into the right files, run `scripts/probe-concerns.py` so open concerns are
+probed rather than re-dated, and, if the constitution changed, `scripts/sync-rules.py`.
+`bash scripts/audit-cheap.sh` before the commit catches what that pass missed.
+
 ## Refreshing a long-running or remote session
 
-If you drive a session over remote control and cannot restart it easily, a
-`/catchup`-style skill re-pulls and re-reads content. Note that it does not reload the
-constitution or skills, which bind at process start; for those, a real restart is the
-only guarantee.
+If you drive a session over remote control and cannot restart it easily, `/catchup`
+re-pulls and re-reads content. It does not reload the constitution or skills, which bind
+at process start; for those, a real restart is the only guarantee.
+
+
+================================================================
+FILE: docs/gated-rules.md
+================================================================
+
+# Gated or judgment: rules that enforce themselves
+
+Every rule in the constitution is in one of three states, and the difference is the
+whole design.
+
+| State | Meaning | How it fails |
+|---|---|---|
+| **Gated** | The bullet names a `Hook:` or a `Check N`. A hook fails the tool call; a check fails the commit. | It cannot be forgotten. It can only be removed, and removing it is visible. |
+| **Judgment** | Recorded in `global/rule-triage.tsv` as having no deterministic signature, with the reason. | It holds only while it is loaded and read. That is the honest state of a rule about conversation. |
+| **Untriaged** | Nobody has decided which of the above it is. | Silently. This is the decay surface, and it is the work queue. |
+
+## Why this is the load-bearing idea
+
+Rules held only in prose decay, and only those do. Measured over four months in the
+spine this scaffold came from: the two always-loaded files with a byte ceiling were flat
+or smaller; the two governed only by a written brevity rule had grown 2x and 5.2x. A
+write-lane guard had been approving every write for weeks behind a bare `except`. A
+rule about decorative numbers stopped applying because its scope said one document kind
+and the document was another. None of that was carelessness. Every one was a rule
+nobody had made mechanical.
+
+So the constitution opens with its own coverage:
+
+> Coverage today: N of M bullets are gated.
+
+That line is measured, never hand-typed. `scripts/find-decayed-rules.py --count` prints
+`gated judgment untriaged`; `scripts/audit-cheap.sh` Check 12 fails the commit when the
+claim and the file disagree. Restating it downward means naming which gate was removed
+and why. That is the ratchet.
+
+## The tools
+
+```bash
+python3 scripts/find-decayed-rules.py              # the full report
+python3 scripts/find-decayed-rules.py --untriaged  # the work queue, with each rule's key
+python3 scripts/find-decayed-rules.py --count      # "gated judgment untriaged"
+```
+
+`global/rule-triage.tsv` holds one row per judgment rule: `<key>\tJUDGMENT\t<why no
+detector can exist>`. The key is derived from the bullet's first bolded phrase; the
+`--untriaged` report prints it for you. JUDGMENT is not an excuse. A detector that fires
+on the wrong things gets disabled, which is worse than no check, so each row says why.
+
+## What counts as a gate
+
+A **hook** (`scripts/hooks/block-*.py`, PreToolUse) when the wrong thing should never
+reach disk: it sees the tool call and exits 2. A **check** (a `section` in
+`scripts/audit-cheap.sh`) when the wrong thing is visible in a diff: it fails the commit.
+Both are named on the rule bullet (`Hook: scripts/hooks/x.py`, `Check 9`), which is what
+`find-decayed-rules.py` reads.
+
+## A fail-open guard cannot report its own death
+
+A PreToolUse guard should fail open: a false block stops real work, so uncertainty exits
+0. But that means a broken guard and an approving guard are byte-identical from outside.
+Silence means both "allowed" and "I crashed". So every fail-open guard needs a self-test
+that asserts it still BLOCKS, run where nobody has to remember it:
+
+- `scripts/test-lanes.sh` feeds the write-lane guard 25 representative writes and
+  asserts the exit code in both directions (over-blocking is its own outage).
+- Check 9 runs it on every commit.
+- The reply-length pair, the budget table and the probe runner each carry the same
+  kind of test (`scripts/tests-*.py`, `--self-test`), and each was verified by
+  reintroducing the bug and watching the test go red.
+
+When you build a gate, prove it blocks: plant the violation, watch PASS turn to FAIL,
+remove it, watch PASS return. Assert behavior, never loadability.
+
+## Adding a rule
+
+1. Write the bullet in `global/CLAUDE.md`, starting with `- **Bold key.**`.
+2. Ask: does this have a deterministic signature? Yes: build the gate and name it on the
+   bullet. No: add a row to `global/rule-triage.tsv`.
+3. `python3 scripts/find-decayed-rules.py --count`, restate the coverage line.
+4. Commit. Check 12 confirms the numbers; the untriaged count must not have grown.
+
+`/reflect implement` walks exactly this loop from a session's learnings. See
+[`miss-to-rule-loop.md`](miss-to-rule-loop.md).
+
+
+================================================================
+FILE: docs/miss-to-rule-loop.md
+================================================================
+
+# The miss-to-rule-plus-check loop
+
+A found miss gets four things, in order, and an apology is not one of them:
+
+1. **The instance fixed.**
+2. **The rule written in its durable home**: a `memory/feedback_*.md` file with the scar
+   attached (what actually went wrong, in the human's words where they said it), a
+   pointer in `memory/MEMORY.md`, and one bullet in `global/CLAUDE.md` if it is
+   always-on.
+3. **A gate wired** when the signature is deterministic: a hook or an `audit-cheap`
+   check, proven to block.
+4. **The bullet naming the gate**, and the coverage line restated from the measured
+   number.
+
+"Sorry, I'll be more careful" is a non-fix: the same failure returns next session because
+nothing in the system changed. The only acceptable response to a miss is a structural
+one.
+
+## Fix the class, not the instance
+
+When a process failure surfaces, add the tripwire that catches the whole category. A
+draft that rotted for a day became Check 6 (any draft older than 7 days). A guard that
+silently approved everything became Check 9 (assert it blocks, every commit). A hook that
+existed but was registered nowhere became Check 10. Each of those was one embarrassment
+turned into a permanent detector.
+
+## A caught output defect adds the missing assertion
+
+If the human finds a property wrong after every existing check passed, encode that
+property in the verifier. A green check proves only the shape it encodes; when a
+property is wrong while its check is green, find the shape the check cannot see and add
+the distribution-level assertion instead of tightening an unrelated threshold.
+
+## The real trigger for a check is revision-survival
+
+Across one session that rewrote a single artifact four times, every rule with a check
+held and got fixed inside the same turn; every rule living only in prose decayed
+silently, because each rewrite re-derives the artifact from the newest instruction and
+drops constraints set two rewrites earlier. A rule carried forward through N rewrites
+has a decay rate; a rule that runs as a check does not. So: anything restated across
+multiple drafts of one artifact needs a check, whatever its signature. Code lanes get
+this for free (compiler, tests); prose lanes do not, and need it built.
+
+## A countable rule prints its count on every run
+
+A check that only speaks on failure leaves slow drift invisible until it trips a
+threshold. `INFO · gated-rule coverage: 12 of 28 (42%)` on a passing run is the point.
+
+## How `/reflect implement` runs it
+
+`skills/reflect/SKILL.md`, implement mode. Per learning it asks one question: does this
+have a deterministic signature? Yes: build the gate (scoped to changed files for anything
+prose-shaped, tuned until precise, honest when it cannot run, with an escape hatch),
+prove it blocks, land the memory file, name the gate on the bullet, restate coverage,
+sync the rules, run the audit, push. No: one row in `global/rule-triage.tsv` saying why
+no detector can exist. Then report what became mechanical, not what was learned.
+
+## Propagate, always
+
+A rule that lives in one repo is not a rule. After any edit to `global/CLAUDE.md`, run
+`python3 scripts/sync-rules.py`. It writes the rules into every code lane, defers the
+commit where a session is open, and never touches a repo published to an outside reader.
+See [`rules-sync-and-shared-repos.md`](rules-sync-and-shared-repos.md).
+
+
+================================================================
+FILE: docs/concerns.md
+================================================================
+
+# Concerns that declare how they close
+
+`brain/CONCERNS.md` is the only brain file that holds "we do not know yet". Every item in
+it names the event that closes it. In most systems nothing ever checks whether that
+event has happened, so items leave the file only when a human happens to re-read it. In
+the spine this came from, that meant three items marked RESOLVED still sitting in the
+open list, one warning about a ceiling cut a week earlier, and a file that had grown
+5.2x, mostly on that.
+
+The fix is not discipline. It is that a concern must declare how it gets checked.
+
+## The contract
+
+Every item under `## Right Now` declares one of:
+
+```markdown
+**Probe:** `<shell command>`
+**Owner:** you
+**Owner:** the alpha lane
+```
+
+- A **Probe** is a command the machine runs on a schedule. It prints one line starting
+  `CLOSED`, `OPEN` or `UNKNOWN`. `scripts/probe-concerns.py` runs it and stamps the
+  result with the date.
+- An **Owner** is the one human or lane who can close it, because no command can observe
+  the closing event. `you` (or `LANE_OS_HUMAN`) means a decision only the human can
+  make: put it in front of them once, then leave it alone. Any other owner is work a lane
+  has to do, and should never reach the human at all.
+
+`audit-cheap.sh` Check 8 fails the commit on an item that declares neither. Check 7 warns
+on an item with no date in the last 30 days: an open concern is probed, never re-dated.
+
+That split is the real content. The file was doing two jobs, an open unknown that
+evidence closes and a decision someone owes, and both decayed the same way. The probe
+report separates them: DECISIONS OWED reaches the human, OWNED WORK does not.
+
+## Rules for a probe
+
+- **A probe never closes an item on its own.** It flags; a human confirms and moves the
+  item to `brain/archive/` with its evidence. The first real run of this system proved
+  why: a probe matched a vendor's marketing mail and reported CLOSED, and the
+  confirmation step found the thing had not happened.
+- **A probe observes the EVENT, never the FILING.** `grep DECISIONS.md` asks whether the
+  decision was written down, not whether it was made, so the only thing that can close
+  it is the act of closing it. Point the probe at a transcript, a customer record, a live
+  endpoint, a branch.
+- **A probe that cannot run says UNKNOWN, never OPEN.** A probe that fails on a missing
+  GNU tool or an old bash and prints nothing has measured nothing. Silence is not
+  evidence. The runner treats a non-zero exit, a timeout, an empty line or an
+  unrecognized first word as UNKNOWN.
+- **Scope a probe to the entity it is about.** A loose match produces a false CLOSED,
+  which costs the confirmation step.
+- Prefer a durable source (a file, a branch, a database, a mail search) over a transient
+  one.
+
+## Running it
+
+```bash
+python3 scripts/probe-concerns.py            # run every probe, stamp the results
+python3 scripts/probe-concerns.py --dry-run  # run, change nothing
+python3 scripts/probe-concerns.py --check    # drift only, no probes (what Check 8 runs)
+```
+
+Output groups the items: READY TO CLOSE, COULD NOT PROBE, DECISIONS OWED, OWNED WORK,
+UNDECLARED. Run it from a spine session's `/catchup`, and on a schedule if you have a
+machine that stays on.
+
+`scripts/tests-probe-concerns.py` asserts each verdict, that CLOSED never removes an
+item, and that stamps replace rather than accumulate.
+
+
+================================================================
+FILE: docs/context-budgets.md
+================================================================
+
+# Byte budgets on context files
+
+Four files load into every session before it is asked anything: the constitution, the
+memory index, `brain/ACTIVE_NOW.md` and `brain/CONCERNS.md`. Each had a written brevity
+rule. Measured over four months, the two with a byte ceiling were flat or smaller; the
+two governed by prose alone had grown 2x and 5.2x, and startup load had gone from 31k to
+81k characters, about 20,000 tokens paid by every lane on every start.
+
+The failure was never carelessness. It was an ungated rule. So every file a session
+reads whole now carries a budget, and every budget lives in one table.
+
+## One table, every consumer
+
+`scripts/check-file-budgets.py` holds the table. `audit-cheap.sh` Check 4 calls it at
+commit time. Any scheduled job you run points at the same script. A second copy of the
+thresholds anywhere is how two gates drift apart.
+
+```bash
+python3 scripts/check-file-budgets.py              # every tracked file
+python3 scripts/check-file-budgets.py --over-only  # findings only
+python3 scripts/check-file-budgets.py --json       # for a job
+# exit 0 clean, 1 a warn, 2 a hard ceiling
+```
+
+| file | warn | fail |
+|---|---|---|
+| `global/CLAUDE.md` | 24k | 40k |
+| `memory/MEMORY.md` | 20k | |
+| `brain/ACTIVE_NOW.md` | 14k | 24k |
+| `brain/CONCERNS.md` | 22k | 36k |
+| the four above, summed | 78k | 104k |
+| `brain/DECISIONS.md` | 100k | |
+| `brain/PEOPLE.md` | 60k | |
+| `brain/WEEKLY_LOG.md`, `brain/WHO_I_AM.md` | 24k | |
+| `projects/*/STATUS.md`, `projects/*/MEMORY.md` | 32k | |
+| `desks/*/LOG.md` | 60k | |
+| `desks/*/CLAUDE.md` | 12k | |
+| a code lane's `CLAUDE.md` | 25k | |
+| a code lane's `BACKLOG.md` | 20k | |
+| a code lane's `DECISIONS.md`, above `## Archive` | 30k | |
+
+Characters, not bytes: a budget about context cost is about characters.
+
+## Threshold policy
+
+A check that fails the next unrelated commit gets disabled, not obeyed. So `fail` exists
+only for the files that load into every session. Everything else is warn-only, because
+which file needs an archival pass, and what in it is still current, is lane judgment. Set
+a new threshold above today's legitimate reading, so the check catches a runaway rather
+than nagging about a file that is merely large on purpose.
+
+Two budgets are deliberately generous for the same reason: nothing in the file goes
+stale by date. A lane's `MEMORY.md` is dense durable fact with no history to archive, and
+`brain/DECISIONS.md` is never pruned by age because an old decision still binds.
+
+## Code repos too
+
+A code lane's own instruction files are read at the start of every session there, so
+they carry budgets from the same table: `CLAUDE.md` holds mechanism only (commands,
+gotchas, hard rules), `BACKLOG.md` is the queue, and `DECISIONS.md` keeps a
+`## Archive` divider with only the half above it budgeted, because that is all a session
+reads. `AGENTS.md` is generated by the rules sync and is deliberately not budgeted; its
+size is the constitution's problem, gated there.
+
+## How to apply
+
+- Adding to one of the four means removing from it in the same edit, once past warn.
+- Depth out of `ACTIVE_NOW` goes to the lane's `STATUS.md`.
+- Resolved concerns go to `brain/archive/` with their evidence, never re-dated in place.
+- Move history to an archive file verbatim. Never delete it to satisfy a number.
+
+`scripts/tests-file-budgets.py` asserts the gate blocks at each level, ignores
+`_TEMPLATE` files, reports an aliased lane once under its canonical path, and charges
+`DECISIONS.md` only above the divider.
+
+
+================================================================
+FILE: docs/drift-checks.md
+================================================================
+
+# Drift checks: audit-cheap and the commit gate
+
+`scripts/audit-cheap.sh` is the fast, mechanical drift detector. It runs in about a
+second, and it catches what a human would only notice by re-reading. It is not a
+semantic audit; it catches the cheap stuff so the LLM pass only has to do the hard stuff.
+
+```bash
+bash scripts/audit-cheap.sh            # full working-tree view
+bash scripts/audit-cheap.sh --staged   # judge only what this commit contains
+bash scripts/audit-cheap.sh --quiet    # FAIL lines only
+bash scripts/audit-cheap.sh --strict   # WARN fails too
+```
+
+Exit 0 clean, 1 a FAIL, 2 usage. Every check has a number, and the constitution names
+the number on the rule it enforces; that is what makes "gated" a measurable word.
+
+## The checks
+
+| # | What it asserts | Level |
+|---|---|---|
+| 1 | Every backticked repo path in the instruction docs exists | FAIL |
+| 2 | Every skill is a symlink in `~/.claude/skills` (installed spine only) | WARN |
+| 3 | Every `[[wikilink]]` resolves and every memory file is indexed (`lane-doctor`) | FAIL |
+| 4 | Every state file is inside its byte budget (`check-file-budgets.py`) | WARN, FAIL at a hard ceiling |
+| 5 | `WEEKLY_LOG.md` holds only the last two weeks | WARN |
+| 6 | No `brain/drafts/` file is older than 7 days | WARN |
+| 7 | Every open concern is dated within 30 days | WARN |
+| 8 | Every open concern declares a Probe or an Owner (`probe-concerns.py --check`) | FAIL |
+| 9 | The write-lane guard still blocks (`test-lanes.sh`, 25 cases) | FAIL |
+| 10 | Every `block-*.py` hook and the reply-length pair are registered in settings.json (installed spine only) | FAIL |
+| 11 | The commit gate judges only the staged set (`tests-audit-cheap-staged.sh`, when the gate's own code changed); repairs a stale installed hook | FAIL |
+| 12 | The `Coverage today: N of M` line matches `find-decayed-rules.py --count` | FAIL; WARN on untriaged rules |
+| 13 | The rules sync's deny list still derives from the publisher (`tests-shared-repos-never-sync.py`) | FAIL |
+| 14 | The two reply-length hooks share their limit and carve-outs, and both self-tests pass | FAIL |
+| 15 | No changed file carries a credential shape (runs in any repo) | FAIL |
+
+## The commit gate
+
+```bash
+bash scripts/install-git-hooks.sh
+```
+
+installs a pre-commit hook in the spine that runs `audit-cheap.sh --quiet --staged`. A
+FAIL blocks the commit. `.git/hooks/` is not tracked, so run it on every fresh clone;
+Check 11 repairs a stale installed hook on its own.
+
+`--staged` is the important word. Parallel lane sessions run against one checkout.
+Without it the gate read the whole working tree, so another session's half-written file
+failed this session's commit, and that session bypassed the gate with `--no-verify` over
+a defect it did not write. A commit gate judges what is being committed. An unstaged edit
+is not skipped, only deferred to the commit that stages it. Interactive runs keep the wide
+view.
+
+`scripts/tests-audit-cheap-staged.sh` asserts both directions in a scratch repo: a
+foreign unstaged defect is ignored under `--staged`, and the same file staged still
+fails. It clears the inherited git environment first, because a test that runs from a
+pre-commit hook otherwise stages into the real index.
+
+## Writing a new check
+
+- Give it a number and a `section`. Use `fail`, `warn`, `info`.
+- Scope it to `changed_paths` for anything prose-shaped. A corpus-wide retrofit is a
+  different decision and usually the wrong one.
+- Tune it until it is precise. A check that fires on a third of the corpus gets switched
+  off, not obeyed.
+- A check that cannot run must say so, never report clean having measured nothing.
+- Say in the code what it deliberately does not catch.
+- Print the count on a passing run. Slow drift is invisible to a check that only speaks
+  on failure.
+- Name it on the rule bullet in `global/CLAUDE.md` and restate the coverage line.
+
+
+================================================================
+FILE: docs/reply-length-gate.md
+================================================================
+
+# The reply-length gate: measure after, instruct before
+
+Every other hook gates a tool call. Sort a session's rule misses by where they happened
+and most are reporting failures, not doing failures: the execution layer held (the lane
+guard fired, the commit gate blocked) and the reply drifted, because nothing watches the
+reply. This pair does.
+
+## Why two halves
+
+A Stop hook fires after the reply exists and has been paid for. Anything it says can only
+be acted on by a second reply, which either restates the answer (rendering the same fact
+twice) or spends a turn saying nothing. A Stop hook can measure drift. It cannot prevent
+the reply it measures.
+
+| Hook | Event | Does |
+|---|---|---|
+| `scripts/hooks/advisory-reply-length.py` | Stop | Reads the transcript, counts the prose words of the final assistant message (fenced blocks excluded), notes self-narration, appends one JSON row to `outputs/reply-length.jsonl`. Says nothing. |
+| `scripts/hooks/preflight-reply-length.py` | UserPromptSubmit | Reads that log for this session. Once 2 of the last 4 real replies ran over the limit, or one narrated its own process, injects one line of context before the next reply. Otherwise silent. |
+
+That conditioning is the point. The rule already lives in the always-loaded
+constitution, so a reminder on every turn buys nothing but tokens; what decays is
+adherence deep into a long session. A well-behaved session costs zero tokens; a drifting
+one costs one line, delivered where it can still change the output.
+
+## The shared contract
+
+Both files carry the same `WORD_LIMIT` (220, generous: the rule says about 10 lines; this
+catches a wall) and the same carve-outs:
+
+- an explicit ask for detail in the prompt ("detailed", "walk me through", "deep dive",
+  "long form") lifts the cap with no pushback;
+- a long-form desk, named in `LANE_OS_LONG_FORM_DESKS` (comma-separated desk names), is
+  standing-lifted.
+
+Two halves of one rule that disagree about when the rule applies are worse than either
+alone, so `audit-cheap.sh` Check 14 asserts the constants still match and both
+`--self-test` runs pass.
+
+## What it logs
+
+```json
+{"ts": "...", "session": "...", "words": 312, "findings": 1, "kinds": ["reply is 312 words"]}
+```
+
+Kinds, not just a count, so the pre-check can say which habit is drifting. Replies under
+25 words are acknowledgements and are excluded from the window, so a long/short
+alternation cannot hide real drift. `outputs/` is gitignored; it is a per-machine
+measurement, not state.
+
+## Debugging
+
+`REPLY_LENGTH_ADVISORY=1` makes the Stop half print its findings again. Self-tests:
+
+```bash
+python3 scripts/hooks/advisory-reply-length.py --self-test
+python3 scripts/hooks/preflight-reply-length.py --self-test
+```
+
+
+================================================================
+FILE: docs/agent-toward-human.md
+================================================================
+
+# Behavioural rules: how the agent treats the human
+
+Most agent instruction files are about the code. The constitution here also carries
+rules for the reply, the report and the ask, because measured across a session's misses,
+most were reporting failures, not doing failures. The section is `## Writing toward the
+human` in `global/CLAUDE.md`, and these are the defaults it ships with. Tune them.
+
+- **Act, do not ask.** Execute the reversible next step and show the result. Ask only for
+  taste, an outward or irreversible send, a secret reaching a public surface, or a lane
+  another session already owns. A recommendation offered as a choice is still a question.
+- **A reply is 10 lines or fewer.** Bullets, one fact per line, no section headers for
+  one subject, no table unless the reader picks between the rows. Answer, then delete
+  every line that does not change what the reader does next. Never render one fact twice
+  (prose, then a table, then a next-step list is three copies of the same answer). Lifted
+  when they ask for detail, with no short version offered first. This one is gated by the
+  reply-length pair ([`reply-length-gate.md`](reply-length-gate.md)).
+- **Report finished work in the envelope:** `STATUS` (done, partial, blocked),
+  `HEADLINE` (one line, what is true now), `DETAIL` (only what changes what they do),
+  `TEST` (what proves it), `NEXT` (what they do, or "nothing"). Render the labels only
+  when the content earns them; a small task is one HEADLINE line. Fires at the end of a
+  unit of work, never every message. A named shape is harder to drift from than an
+  adjective like "concise".
+- **Never the debugging journey.** Report what is true now and what they do next. Cut
+  failed attempts, wrong diagnoses, a tour of what broke, and the cause of a thing they
+  asked to be gone (once it is gone, the cause is the model's work log). Keep the outcome,
+  anything they must do, and a real risk they have to decide on.
+- **On a miss: state the corrected fact and continue.** No apology wrapper, and never the
+  apology in place of the structural fix ([`miss-to-rule-loop.md`](miss-to-rule-loop.md)).
+- **Resume the queued request after a blocker clears.** An interleaved question does not
+  cancel it.
+- **Never size or clock the work.** No time estimates, no "quick", no phantom timelines.
+- **Never explain a thing to someone who already knows it.**
+- **Never negotiate against yourself.** State terms once and stop.
+- **A handoff states GOAL, BOUNDARY, and the facts the other session cannot discover.**
+  Never implementation steps.
+
+Every one of these except the reply cap is judgment, recorded as such in
+`global/rule-triage.tsv` with the reason no detector can exist. That honesty is part of
+the design: an un-gateable rule recorded as judgment stops reading as a gap, and the
+decay surface shrinks to work that is real.
+
+
+================================================================
+FILE: docs/switchboard.md
+================================================================
+
+# The switchboard: what the other windows are doing
+
+The write-lane invariant keeps sessions from writing into each other. It says nothing
+about reading. The switchboard is the read side: a per-machine, gitignored map of every
+lane, so a session in one window can see what moved elsewhere without any lane writing
+into another.
+
+```bash
+python3 scripts/build-switchboard.py
+# switchboard/SWITCHBOARD.html   a row per lane
+# switchboard/state.json         {built, built_human, lanes: {name: {head, ts, subject, focus, kind}}}
+```
+
+The SessionStart hook refreshes it in the background on every session start and prints
+one pointer line to it. Run it on a schedule too if you have a machine that stays on.
+
+## Two things it does beyond `git log -1`
+
+**Freshness is measured on the newest non-bot commit.** The rules sync touches every
+lane whenever the constitution changes. Without this filter each sync lights up "moved
+<24h" on lanes nobody has opened in weeks, which is exactly the signal the page exists to
+carry. `BOT_SUBJECTS` is deliberately conservative: under-filtering costs a stale-looking
+row, over-filtering hides real work.
+
+**Each lane carries a `focus`.** "What landed here" is the last commit. "What is this
+lane chewing on" exists in a session or a STATUS note before it is ever a commit, and it
+is the thing a neighbouring session actually needs. The builder reads the newest dated
+`## YYYY-MM-DD ...` heading out of the lane's spine-facing state file
+(`projects/<name>/STATUS.md`, or `desks/<name>/LOG.md`). Zero adoption cost: dated
+headings already exist in most STATUS files, and an undated heading is a section label
+that reports nothing, so it is ignored.
+
+## The rule it serves
+
+**Ask the neighbouring lane before re-deriving what it already knows.** Overlap between
+what you are about to do and another lane's `focus` means message that session (or drive
+it: `cd <repo> && claude -p "<goal>"`), never a write into its lane.
+
+## Configuration
+
+`LANE_OS_WORKSPACE_ROOTS` (colon-separated) names the directories that hold code repos;
+default `~/repos:~/work`. Desks are read from the spine. The spine itself is skipped. A
+lane with no human commit in 14 days is shown as idle, not removed: archiving is a
+deliberate move.
+
+
+================================================================
+FILE: docs/rules-sync-and-shared-repos.md
+================================================================
+
+# Rules sync, and repos an outside reader sees
+
+Two scripts, one manifest, and two safety properties that each failed as prose before
+they were code.
+
+## The manifest: `workspace.toml`
+
+Names your workspace roots (where code repos live), the paths the sync writes inside
+each lane, and the repos that receive the rules. A repo not listed is still picked up
+when it already carries a generated copy, so a lane you bootstrapped by hand keeps
+syncing.
+
+## The sync: `scripts/sync-rules.py`
+
+A rule that lives in one repo is not a rule. After any edit to `global/CLAUDE.md`:
+
+```bash
+python3 scripts/sync-rules.py            # write, commit, push in every target
+python3 scripts/sync-rules.py --dry-run
+python3 scripts/sync-rules.py alpha      # one repo (an operator override)
+```
+
+Per target it writes `.claude/global-rules.md` (a generated copy with a header saying
+so), makes sure the lane's `CLAUDE.md` imports it with `@.claude/global-rules.md` (so
+the lane's own mechanism notes stay), and keeps a marked block current in `AGENTS.md`
+for agents that read that instead.
+
+**Property 1: it never touches the git index of a repo with a session open.** It still
+writes the files, which is safe because they are generated and never hand-edited in a
+lane, and the lane's next commit carries them. It defers only `git add` and
+`git commit`, reporting `deferred: session open`. Skipping the repo outright is not a
+deferral: a lane with a long-lived session then never syncs and works to rules the rest
+of the workspace has replaced. Liveness is decided by `~/.claude/sessions/<pid>.json`
+plus `os.kill(pid, 0)`, not file age. A `deferred` row is not a failure and needs no
+follow-up.
+
+**Property 2: it never writes into a repo published to an outside reader.** See below.
+
+A rejected push gets up to three rebase-and-retry rounds (generated state rebases
+safely); a conflict aborts and is reported, never resolved blind. A `commit failed` row
+means a repo-side gate refused it: read that before re-running anything.
+
+## The publisher: `scripts/publish-shared-repo.py`
+
+A collaborator or partner reads a repo through their own agent. They never see your
+spine. The publisher produces the repo they read, from one lane, under three rules:
+
+1. **Allowlist the paths, deny-list the rest.** Named folders of one lane publish whole.
+   Nothing outside the lane is reachable, because the lane path is the root of the walk.
+2. **Fail closed on content.** Every byte about to be written is scanned against the
+   deny patterns (credentials, an `INTERNAL ONLY` marker, paths into the private spine,
+   banking identifiers, plus per-audience patterns). One hit aborts the whole publish
+   and writes nothing, naming the file, the line and the reason. Fix the source or deny
+   the file; never loosen a pattern to get past it.
+3. **Only this script commits there, and only what it wrote.** It resets the target to
+   origin before writing (every file is derived, so two hosts publishing produce
+   identical competing commits; rebasing them is work with no answer), stages an
+   allowlist rather than `git add -A`, and refuses to commit if any file it did not write
+   is present. It installs `scripts/hooks/shared-repo-pre-commit.sh` into the target as
+   a second lock, which refuses any staged file outside the published manifest. `inbox/`
+   is the reader's, and flows the other way.
+
+After the push it confirms against origin, not against its own exit code: a publisher
+that cannot see its own output is not finished.
+
+```bash
+python3 scripts/publish-shared-repo.py example-partner-docs --dry-run
+python3 scripts/publish-shared-repo.py example-partner-docs
+```
+
+`AUDIENCES` in the script is the table: one key per outside reader, which is also the
+repo name. The shipped entry is an invented example; replace it.
+
+## Why the deny list derives from the publisher
+
+The same leak happened twice in the spine this came from. The sync discovered a shared
+checkout (it carried a generated copy) and wrote the full constitution into it. The fix
+was a hand-kept deny list. Four days later a new shared repo was created by a different
+workflow, the list did not cover it, and the sync did it again; only the publisher's own
+commit lock stopped the push.
+
+Nothing was remembered wrong. The guard was a list a human had to update, and the thing
+it guards gets created elsewhere. So `workspace_lib.deny_sync_names()` now unions the
+hand-kept `deny_sync` with `published_audience_names()`, which parses the `AUDIENCES`
+dict out of the publisher with `ast`. Adding an audience denies the sync automatically.
+It is parsed, never imported, because executing the publisher would run its argument
+parsing; and because a rename inside the publisher would make the parse return an empty
+set, which denies nothing extra and reads as a pass, `scripts/tests-shared-repos-never-sync.py`
+asserts the parse still finds the audiences, that every one is denied, that ordinary
+repos are still targets, and that the scrub aborts on a planted hit. Check 13 runs it on
+every commit.
+
+Two independent guards is why the second event was a near miss rather than a leak. Keep
+both.
+
+
+================================================================
+FILE: docs/parallel-lanes-worktrees.md
+================================================================
+
+# Parallel work in one lane: worktrees
+
+The write-lane guard stops a session writing into another lane. It does not stop two
+sessions in the same lane sharing one checkout, and that collision is real: a driven
+session's interleaved commit landing under your session's commit message, a `git reset`
+in one window silently unstaging what the other staged.
+
+**Two sessions must never share one checkout.** A branch separates history. A worktree
+separates the files, and the collision is a file problem.
+
+```bash
+git worktree add ../<name>-<task> -b <branch>   # a second, isolated checkout of the same repo
+git worktree remove ../<name>-<task>            # on merge
+```
+
+- Use one when two sessions must work in one repo at the same time, when `main` must
+  stay releasable during a long change, or when two states must run side by side.
+- Do not use one for separate repos, or for one change after another. One window per
+  repo stays the default.
+- A worktree isolates files only. Both sessions still share one database, one deploy
+  target, one app-store console. Bar the second session from every deploy and store
+  action in its handoff.
+- A new worktree has no `node_modules` and no `.env.local`, because both are gitignored.
+  Each one needs its own install.
+
+## Driven sessions share the git index
+
+When a spine session drives a lane (`cd <repo> && claude -p "<goal>"`) to edit that
+lane's `projects/<name>/` mirror, the child writes and commits into the same spine
+checkout the parent is using. The working tree is shared, and so is `.git/index`, which
+is a single file with no per-session isolation.
+
+- While a driven session is running, the parent runs no `git add`, `git commit`,
+  `git reset` or `git stash` in the spine. Write files freely; stage nothing.
+- Drive lanes one at a time when they write into the spine.
+- Tell the child in its handoff: stage and commit in one step, never a bare `git reset`.
+- Verify after with `git show --stat HEAD`, and confirm the commit contains what its
+  message claims. Do not trust that the commit you just made is the commit you meant.
+- Large or long-running lane work gets its own worktree instead.
+
+## Honest status
+
+This page is judgment, not a gate: nothing mechanical stops two sessions opening the
+same checkout. A per-lane lockfile that queues a headless drive behind an open window
+would make it one, and is the obvious next gate to build. `global/rule-triage.tsv`
+records it as judgment for that reason, with the reason.
 
 
 ================================================================
@@ -400,6 +1208,19 @@ it needs.
 - A recalled memory reflects what was true when written; verify a named file or flag
   still exists before acting on it.
 
+## How facts get in
+
+Saving a fact used to depend on the model noticing, mid-session, that a fact was
+durable. `/reflect` makes the sweep a step: it dedups against what is already recorded,
+stages additive facts in `brain/drafts/` for the next spine merge, and puts anything
+that would change an always-loaded instruction under a section the human decides.
+`/reflect implement` goes one step further and lands a learning as a gate. See
+[`miss-to-rule-loop.md`](miss-to-rule-loop.md).
+
+`scripts/lane-doctor.sh` (Check 3) keeps the index honest: every memory file listed,
+every `[[wikilink]]` resolving. `memory/MEMORY.md` carries a byte budget like every other
+file a session reads whole.
+
 
 ================================================================
 FILE: docs/multi-machine.md
@@ -437,6 +1258,15 @@ coherent across each other.
 The hook and guard locate the spine via `LANE_OS_ROOT` first, then a list of common
 locations. If your spine lives somewhere unusual on a given machine, set
 `LANE_OS_ROOT` in that machine's shell profile and everything else follows.
+
+## The rules reach every code lane too
+
+Symlinks cover the machines you configured. `python3 scripts/sync-rules.py` covers the
+rest: it writes the constitution into each code lane's `.claude/global-rules.md` and
+`AGENTS.md`, so a standalone clone, a remote host or a cloud-style task in that repo
+reads the same rules. It defers the commit in a repo with a session open and never
+touches a repo an outside reader sees. See
+[`rules-sync-and-shared-repos.md`](rules-sync-and-shared-repos.md).
 
 ## Remote / always-on hosts (code from anywhere)
 
@@ -559,15 +1389,15 @@ FILE: docs/getting-started.md
 
 # Getting started
 
-## 1. Clone the spine
+## 1. Clone it as your spine
 
 ```bash
 git clone https://github.com/<you>/lane-os.git ~/work/spine
 cd ~/work/spine
 ```
 
-In a real deployment you would fork this to a PRIVATE repo first, since your spine
-fills up with personal context. This public repo is the generic template.
+Rename the folder to anything. Make the repo private: your real spine holds your
+context. The hooks look for the spine at a few common paths and honor `LANE_OS_ROOT`.
 
 ## 2. Install
 
@@ -575,48 +1405,83 @@ fills up with personal context. This public repo is the generic template.
 bash scripts/install.sh
 ```
 
-This symlinks the constitution and hook into `~/.claude`, links the skills, and
-registers the SessionStart and PreToolUse hooks in `~/.claude/settings.json`. Restart
-Claude Code afterward so the hooks load.
+Symlinks `global/CLAUDE.md` into `~/.claude`, links the skills, registers the
+SessionStart, PreToolUse, Stop and UserPromptSubmit hooks in `~/.claude/settings.json`,
+and installs the pre-commit gate in the spine. Restart Claude Code afterward so the hooks
+load.
 
-Optionally add `export LANE_OS_ROOT="$HOME/work/spine"` to your shell profile.
+Optionally add to your shell profile:
+
+```bash
+export LANE_OS_ROOT="$HOME/work/spine"
+export LANE_OS_WORKSPACE_ROOTS="$HOME/repos:$HOME/work"   # where your code repos live
+```
 
 ## 3. Make the spine yours
 
-Fill in the templates. Start with the two that matter most:
+Fill in the templates. Start with the ones that matter most:
 
-- `brain/WHO_I_AM.md` - who you are and how you want the agent to work.
-- `brain/ACTIVE_NOW.md` - what is live right now.
+- `brain/WHO_I_AM.md`: who you are and how you want the agent to work.
+- `brain/ACTIVE_NOW.md`: what is live right now.
+- `brain/CONCERNS.md`: the open unknowns, each with a `**Probe:**` or an `**Owner:**`.
+- `workspace.toml`: your workspace roots and the code repos that receive the rules.
 
-Then trim `global/CLAUDE.md` to your actual rules and delete the placeholder lines.
+Then trim `global/CLAUDE.md` to your actual rules. Every `- ` bullet in it is a rule:
+either name the hook or check that enforces it, or add a row to
+`global/rule-triage.tsv` saying why none can. Restate the `Coverage today` line from
+`python3 scripts/find-decayed-rules.py --count`; Check 12 will hold you to it.
 
-## 4. Add your first code lane
-
-Pick a real code repo and register a mirror for it:
-
-```bash
-scripts/new-lane.sh code my-app
-```
-
-Now open a Claude Code session inside `my-app`. The hook will recognize it as a code
-lane, inject its STATUS, and scope its writes. Try editing a brain file from there:
-the guard will block it. That block is the system working.
-
-## 5. Add a desk
+## 4. Prove the gates are live
 
 ```bash
-scripts/new-lane.sh desk planning
+bash scripts/audit-cheap.sh
 ```
 
-Fill `desks/planning/CLAUDE.md` with that desk's posture, then open a session there.
+Fifteen checks, about a second. The interesting ones on day one: Check 9 (the write-lane
+guard blocks, 25 cases), Check 12 (the coverage line matches the file), Check 8 (every
+concern declares how it closes), Check 4 (every state file is inside its budget).
 
-## 6. Use the lifecycle
+## 5. Add your first code lane
 
-- `/orient` when you sit down.
+```bash
+scripts/new-lane.sh code my-app        # creates projects/my-app/ from the template
+python3 scripts/sync-rules.py my-app   # writes the constitution into the repo
+```
+
+Add a `[[repos]]` entry for `my-app` in `workspace.toml` so future syncs reach it. Now
+open a Claude Code session inside `my-app`. The hook recognizes it as a code lane,
+points it at its STATUS and MEMORY, and scopes its writes. Try editing a brain file from
+there: the guard blocks it. That block is the system working.
+
+## 6. Add a desk
+
+```bash
+scripts/new-lane.sh desk research
+```
+
+Fill that desk's `CLAUDE.md` with its posture, then open a session there.
+
+## 7. Use the lifecycle
+
+- `/orient` when you sit down (spine session).
 - `/spark` to capture an idea from any lane without losing focus.
-- `/catchup` to re-sync a session after another window pushed changes.
+- `/catchup` to re-sync a session after another window pushed changes; it merges drafts
+  and runs the concern probes.
+- `/preflight` before a non-trivial build; `/ship` when it is done.
+- `/reflect implement` when a session taught you something: it lands the learning as a
+  gate, not a note.
 - `/spin-lane` to graduate an idea into a real lane.
 
-That is the whole loop: orient, work in lanes, capture, merge from the spine, repeat.
+## 8. Keep it honest
+
+- After any edit to `global/CLAUDE.md`: `python3 scripts/sync-rules.py`.
+- On a machine that stays on, schedule `scripts/probe-concerns.py`,
+  `scripts/check-file-budgets.py --over-only` and `scripts/build-switchboard.py`.
+- When you publish a lane's docs to someone outside your workspace, add them as an
+  audience in `scripts/publish-shared-repo.py` and publish through it. The sync denies
+  that repo from that moment.
+
+That is the whole loop: orient, work in lanes, capture, merge from the spine, and let
+the checks catch what you forgot.
 
 
