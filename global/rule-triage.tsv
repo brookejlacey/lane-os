@@ -1,0 +1,28 @@
+# Rule triage: which standing rules can be machine-enforced, and which genuinely cannot.
+#
+# Format: <rule-key>\t<verdict>\t<reason>
+# Verdict is JUDGMENT only. A rule that can be gated does not belong here; it belongs in
+# a hook or a check, and the rule bullet names it. Absence from this file plus absence of
+# a named gate is the decay surface, reported by scripts/find-decayed-rules.py.
+#
+# JUDGMENT is not an excuse. It means: a detector would fire on the wrong things, and a
+# check that cries wolf gets disabled, which is worse than no check. Each row says why.
+# The key is what find-decayed-rules.py derives from the bullet's first bolded phrase;
+# run it with --untriaged to see the exact key for a new rule.
+
+act-do-not-ask	JUDGMENT	Governs whether to ask before acting. The signal is the conversation, not any file. No artifact to inspect.
+ask-the-far-end-never-the-exit-code	JUDGMENT	Governs what the agent does after a write. The substance is whether the destination was queried, which leaves no trace in the repo.
+verify-the-promise-not-the-layer	JUDGMENT	Whether a promise was exercised end to end. A passing test proves the test ran, never that the right thing was tested.
+a-lane-you-cannot-write-is-still-a-lane-you-can-drive	JUDGMENT	A routing choice made in conversation. The guard blocks the wrong write; whether the agent then drives the right lane or hands back the window is not visible to a check.
+two-sessions-never-share-one-checkout	JUDGMENT	Two sessions in one checkout leave no file-level signature until they collide. A per-lane lockfile would gate it; until one exists this is judgment, and the doc says so.
+ask-the-neighbouring-lane-before-re-deriving-what-it-alrea	JUDGMENT	Whether a session asked a neighbour before re-deriving work is a conversation event, not a repo state.
+report-finished-work-in-the-envelope	JUDGMENT	Replies are not files. No check can see them. Enforced by being specific enough that a missing HEADLINE is visible to the reader.
+on-a-miss	JUDGMENT	A reply-shape rule. The reply-length pair measures length and self-narration; the substance of a corrected fact is not detectable.
+resume-the-queued-request-after-a-blocker-clears	JUDGMENT	Whether a queued request was resumed is conversation state with no artifact.
+never-size-or-clock-the-work	JUDGMENT	A clock written into a file has a signature; a clock spoken in chat does not. The chat half is the one that decays, and it is model-side.
+never-explain-a-thing-to-someone-who-already-knows-it	JUDGMENT	Depends on who the reader is. No detector can know that.
+never-negotiate-against-yourself	JUDGMENT	Negotiation posture in copy the human sends. Too varied in wording for a pattern that does not also match legitimate offers.
+a-handoff-states-goal-boundary-and-facts-the-other-sessi	JUDGMENT	A handoff is a prompt, not a file. Its shape is visible to the reader, not to a check.
+build-pre-flight-before-any-non-trivial-build	JUDGMENT	Non-trivial is a judgment. A hook that fires on every new file is noise; /preflight is the mechanism and skipping it is the miss.
+log-deviations-during-the-build	JUDGMENT	Whether a judgment call was logged or silently absorbed cannot be detected from the code. /ship reads the log; an empty one is not evidence of none.
+ship-through-ship	JUDGMENT	Whether a change went through the ship flow is not recoverable from the commit. The commit gate covers the mechanical half.
