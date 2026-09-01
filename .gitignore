@@ -23,3 +23,12 @@ Thumbs.db
 # memory/*.md
 # projects/*/
 # desks/*/
+
+# Local, per-machine measurement logs (the reply-length Stop hook writes here).
+outputs/
+
+# Build-scoped deviation log seeded by /preflight and consumed by /ship.
+implementation-notes.md
+
+# Python bytecode
+__pycache__/
