@@ -41,6 +41,11 @@ own `CLAUDE.md` (its contract and posture) and `LOG.md` (its running record). A 
 session reads its own `CLAUDE.md` first and works from its slice; it does not load the
 whole brain.
 
+A **voice register** is a desk with two more files and a corpus: one register of one
+person's writing, so a session in it cannot answer in another register's voice or edit
+another register's files. Scaffold it with `scripts/new-lane.sh voice <register>`. See
+`docs/voice-layer.md`.
+
 ## Why mirror code lanes instead of putting status in the repo
 
 Two reasons. First, it keeps all of your cross-project state in one place, so a spine

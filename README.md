@@ -22,30 +22,43 @@ Ordered by what is hardest to find elsewhere.
 
 `brain/CONCERNS.md` holds the open unknowns. Every item declares a **Probe** (a shell command the machine runs on a schedule, printing `CLOSED`, `OPEN` or `UNKNOWN`) or an **Owner** (the one human or lane who can close it, because no command can observe the closing event). `scripts/probe-concerns.py` runs the probes, stamps the results and sorts the file into READY TO CLOSE, DECISIONS OWED and OWNED WORK. A probe never closes an item on its own; it flags, a human confirms. A concern that declares neither fails the commit. [`docs/concerns.md`](docs/concerns.md)
 
-### 2. The miss-to-rule-plus-check loop, with a gated-coverage ratchet
+### 2. A voice layer: distilled rules plus a raw corpus
+
+Describe the voice you want and you get the average of everyone who ever claimed those
+adjectives, which is the corporate-brochure register. So a **voice register** is a lane:
+`VOICE.md` holds the distilled rules (a "sound like" list and a longer, more useful
+"never sound like" list), and `corpus/` holds unedited real samples as dated pulls,
+replies kept separately from posts and typed kept apart from spoken. Rules drift because
+they are somebody's summary; the corpus does not. Every draft is read by
+`scripts/check-voice.py` before a human sees it: thirteen mechanical checks whose
+thresholds are measured from that writer's own corpus rather than from a style guide.
+Check 16 proves the checks still fire; Check 17 runs them on the changed drafts.
+[`docs/voice-layer.md`](docs/voice-layer.md)
+
+### 3. The miss-to-rule-plus-check loop, with a gated-coverage ratchet
 
 A found miss gets the instance fixed, the rule written with its scar attached, a gate wired when the signature is deterministic, and the rule bullet naming the gate. `/reflect implement` runs that loop from a session's learnings. The constitution opens with `Coverage today: N of M bullets are gated`; that number is measured by `scripts/find-decayed-rules.py`, rules with no deterministic signature are triaged in `global/rule-triage.tsv` with the reason, and Check 12 fails the commit when the claim and the file disagree. The decay surface is a list you work down, not a thing you rediscover one embarrassment at a time. [`docs/gated-rules.md`](docs/gated-rules.md), [`docs/miss-to-rule-loop.md`](docs/miss-to-rule-loop.md)
 
-### 3. The write-lane invariant
+### 4. The write-lane invariant
 
 A session may write only to the lane it owns plus the shared inbox `brain/drafts/`. A code lane writes its repo and its `projects/<name>/` mirror; a desk writes its `desks/<topic>/`; only a spine session rebuilds the cross-cutting files. A `PreToolUse` guard blocks out-of-lane writes at the keystroke, a SessionStart directive tells each session its boundary, and because a fail-open guard cannot report its own death, `scripts/test-lanes.sh` feeds it 25 representative writes on every commit and asserts it still blocks. [`docs/write-lane-invariant.md`](docs/write-lane-invariant.md)
 
-### 4. Byte budgets on context files
+### 5. Byte budgets on context files
 
 Every file a session reads whole carries a budget in one table, `scripts/check-file-budgets.py`: hard ceilings for the four always-loaded files, warn-only for everything else, the four summed as their own row, and a code lane's own `CLAUDE.md`, `BACKLOG.md` and `DECISIONS.md` (above its `## Archive` divider) from the same table. Prune before you add; move history to an archive file verbatim. [`docs/context-budgets.md`](docs/context-budgets.md)
 
-### 5. A synthesis layer above the codebase
+### 6. A synthesis layer above the codebase
 
 `brain/` holds what no single repo can: who you are, what is live right now across every lane, the decisions and their reasoning, the open concerns, the people, a two-week log. Code lanes mirror a thin `STATUS.md` and `MEMORY.md` into `projects/`, and a spine session rebuilds the brain from those plus the drafts every lane may stage. `memory/` holds durable facts one per file. The switchboard shows what every other window is doing and what it is currently on, so a session asks the neighbouring lane instead of re-deriving its work. [`docs/architecture.md`](docs/architecture.md), [`docs/switchboard.md`](docs/switchboard.md)
 
-### 6. Behavioural rules for the agent toward the human
+### 7. Behavioural rules for the agent toward the human
 
 The constitution carries rules for the reply, not only the code: a reply is ten lines or fewer, finished work is reported in a five-line envelope, a miss gets the corrected fact and no apology, nothing gets sized or clocked. The reply cap is gated by a pair of hooks: a Stop hook that only measures, and a UserPromptSubmit hook that instructs before the next reply once the log shows drift, so a well-behaved session pays nothing. The rest are recorded as judgment, honestly, with the reason no detector can exist. [`docs/agent-toward-human.md`](docs/agent-toward-human.md), [`docs/reply-length-gate.md`](docs/reply-length-gate.md)
 
 ### Also in the box
 
 - **The session-start pointer hook.** Detects the lane from the working directory, pulls, and injects a compact read-directive naming the exact files to read, never their contents (hook stdout truncates; a dumped file is a silently half-read file). [`docs/session-lifecycle.md`](docs/session-lifecycle.md)
-- **`audit-cheap.sh`**, fifteen sub-second drift checks wired into a pre-commit hook that judges only the staged set, so parallel sessions in one checkout do not fail each other's commits. [`docs/drift-checks.md`](docs/drift-checks.md)
+- **`audit-cheap.sh`**, seventeen sub-second drift checks wired into a pre-commit hook that judges only the staged set, so parallel sessions in one checkout do not fail each other's commits. [`docs/drift-checks.md`](docs/drift-checks.md)
 - **The rules sync** that propagates the constitution into every code lane, defers the commit in a repo with a live session (writes are safe, the git index is not), and can never write into a repo published to an outside reader, because its deny list derives from the publisher's own audience table. **The shared-repo publisher** with per-audience allow and deny lists, a fail-closed content scrub, an allowlisted commit and a second lock installed in the target. [`docs/rules-sync-and-shared-repos.md`](docs/rules-sync-and-shared-repos.md)
 - **`/preflight` and `/ship`**, the open and close of a build: five gates, a blind-spot pass, a bounded interview, a plan ordered by what will change, a deviation log the build writes into and the ship step folds into an honest Verified / Code-shipped / Inferred report.
 - **Worktree guidance** for two sessions in one lane, and what a driven session does to your git index. [`docs/parallel-lanes-worktrees.md`](docs/parallel-lanes-worktrees.md)
@@ -67,6 +80,7 @@ lane-os/
 ├── memory/                    # durable facts, one file per fact, indexed by MEMORY.md
 ├── projects/_TEMPLATE/        # STATUS.md + MEMORY.md mirror, one per code lane
 ├── desks/_TEMPLATE/           # CLAUDE.md + LOG.md, one per topic desk
+├── desks/_TEMPLATE-voice/     # a voice register: VOICE.md + voice.toml + corpus/ + outbox/
 ├── skills/                    # orient, catchup, today, week, since, spark, spin-lane, recall,
 │                              # reflect (+ implement mode), preflight, ship
 ├── hooks/session-start.sh     # detects the lane, pulls, injects the read-directive
@@ -76,7 +90,8 @@ lane-os/
 │   │   ├── advisory-reply-length.py     # Stop: measures the reply, silent
 │   │   ├── preflight-reply-length.py    # UserPromptSubmit: instructs on drift
 │   │   └── shared-repo-pre-commit.sh    # the second lock inside a shared repo
-│   ├── audit-cheap.sh         # 15 drift checks; the pre-commit gate runs it --staged
+│   ├── audit-cheap.sh         # 17 drift checks; the pre-commit gate runs it --staged
+│   ├── check-voice.py         # the 13 voice checks; --measure reads the register's corpus
 │   ├── find-decayed-rules.py  # gated / judgment / untriaged, the coverage ratchet
 │   ├── probe-concerns.py      # runs every concern's Probe, stamps the result
 │   ├── check-file-budgets.py  # the one budget table
@@ -134,6 +149,7 @@ A single ever-growing instruction file loads in full on every session, gets expe
 - [`docs/drift-checks.md`](docs/drift-checks.md), audit-cheap and the staged commit gate
 - [`docs/reply-length-gate.md`](docs/reply-length-gate.md), measure after, instruct before
 - [`docs/agent-toward-human.md`](docs/agent-toward-human.md), the behavioural rules
+- [`docs/voice-layer.md`](docs/voice-layer.md), distilled rules plus a raw corpus, and the draft linter
 - [`docs/switchboard.md`](docs/switchboard.md), what the other windows are doing
 - [`docs/rules-sync-and-shared-repos.md`](docs/rules-sync-and-shared-repos.md), propagation, and repos an outside reader sees
 - [`docs/parallel-lanes-worktrees.md`](docs/parallel-lanes-worktrees.md), two sessions in one lane

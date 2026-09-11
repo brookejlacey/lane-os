@@ -33,6 +33,8 @@ the number on the rule it enforces; that is what makes "gated" a measurable word
 | 13 | The rules sync's deny list still derives from the publisher (`tests-shared-repos-never-sync.py`) | FAIL |
 | 14 | The two reply-length hooks share their limit and carve-outs, and both self-tests pass | FAIL |
 | 15 | No changed file carries a credential shape (runs in any repo) | FAIL |
+| 16 | Every voice check still fires on its positive sample and stays silent on its negative (`check-voice.py --self-test`) | FAIL |
+| 17 | Changed drafts under a register's `outbox/` carry no tell, and a changed corpus has been re-measured | WARN |
 
 ## The commit gate
 
@@ -61,6 +63,9 @@ pre-commit hook otherwise stages into the real index.
 - Give it a number and a `section`. Use `fail`, `warn`, `info`.
 - Scope it to `changed_paths` for anything prose-shaped. A corpus-wide retrofit is a
   different decision and usually the wrong one.
+- Ship it as a WARN. It becomes a FAIL only after it has passed on real work with no
+  false positive, and the promoting commit says how many. A gate that cries wolf teaches
+  the next session to bypass every gate, including the ones that were right.
 - Tune it until it is precise. A check that fires on a third of the corpus gets switched
   off, not obeyed.
 - A check that cannot run must say so, never report clean having measured nothing.

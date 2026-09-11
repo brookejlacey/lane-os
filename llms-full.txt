@@ -30,30 +30,43 @@ Ordered by what is hardest to find elsewhere.
 
 `brain/CONCERNS.md` holds the open unknowns. Every item declares a **Probe** (a shell command the machine runs on a schedule, printing `CLOSED`, `OPEN` or `UNKNOWN`) or an **Owner** (the one human or lane who can close it, because no command can observe the closing event). `scripts/probe-concerns.py` runs the probes, stamps the results and sorts the file into READY TO CLOSE, DECISIONS OWED and OWNED WORK. A probe never closes an item on its own; it flags, a human confirms. A concern that declares neither fails the commit. [`docs/concerns.md`](docs/concerns.md)
 
-### 2. The miss-to-rule-plus-check loop, with a gated-coverage ratchet
+### 2. A voice layer: distilled rules plus a raw corpus
+
+Describe the voice you want and you get the average of everyone who ever claimed those
+adjectives, which is the corporate-brochure register. So a **voice register** is a lane:
+`VOICE.md` holds the distilled rules (a "sound like" list and a longer, more useful
+"never sound like" list), and `corpus/` holds unedited real samples as dated pulls,
+replies kept separately from posts and typed kept apart from spoken. Rules drift because
+they are somebody's summary; the corpus does not. Every draft is read by
+`scripts/check-voice.py` before a human sees it: thirteen mechanical checks whose
+thresholds are measured from that writer's own corpus rather than from a style guide.
+Check 16 proves the checks still fire; Check 17 runs them on the changed drafts.
+[`docs/voice-layer.md`](docs/voice-layer.md)
+
+### 3. The miss-to-rule-plus-check loop, with a gated-coverage ratchet
 
 A found miss gets the instance fixed, the rule written with its scar attached, a gate wired when the signature is deterministic, and the rule bullet naming the gate. `/reflect implement` runs that loop from a session's learnings. The constitution opens with `Coverage today: N of M bullets are gated`; that number is measured by `scripts/find-decayed-rules.py`, rules with no deterministic signature are triaged in `global/rule-triage.tsv` with the reason, and Check 12 fails the commit when the claim and the file disagree. The decay surface is a list you work down, not a thing you rediscover one embarrassment at a time. [`docs/gated-rules.md`](docs/gated-rules.md), [`docs/miss-to-rule-loop.md`](docs/miss-to-rule-loop.md)
 
-### 3. The write-lane invariant
+### 4. The write-lane invariant
 
 A session may write only to the lane it owns plus the shared inbox `brain/drafts/`. A code lane writes its repo and its `projects/<name>/` mirror; a desk writes its `desks/<topic>/`; only a spine session rebuilds the cross-cutting files. A `PreToolUse` guard blocks out-of-lane writes at the keystroke, a SessionStart directive tells each session its boundary, and because a fail-open guard cannot report its own death, `scripts/test-lanes.sh` feeds it 25 representative writes on every commit and asserts it still blocks. [`docs/write-lane-invariant.md`](docs/write-lane-invariant.md)
 
-### 4. Byte budgets on context files
+### 5. Byte budgets on context files
 
 Every file a session reads whole carries a budget in one table, `scripts/check-file-budgets.py`: hard ceilings for the four always-loaded files, warn-only for everything else, the four summed as their own row, and a code lane's own `CLAUDE.md`, `BACKLOG.md` and `DECISIONS.md` (above its `## Archive` divider) from the same table. Prune before you add; move history to an archive file verbatim. [`docs/context-budgets.md`](docs/context-budgets.md)
 
-### 5. A synthesis layer above the codebase
+### 6. A synthesis layer above the codebase
 
 `brain/` holds what no single repo can: who you are, what is live right now across every lane, the decisions and their reasoning, the open concerns, the people, a two-week log. Code lanes mirror a thin `STATUS.md` and `MEMORY.md` into `projects/`, and a spine session rebuilds the brain from those plus the drafts every lane may stage. `memory/` holds durable facts one per file. The switchboard shows what every other window is doing and what it is currently on, so a session asks the neighbouring lane instead of re-deriving its work. [`docs/architecture.md`](docs/architecture.md), [`docs/switchboard.md`](docs/switchboard.md)
 
-### 6. Behavioural rules for the agent toward the human
+### 7. Behavioural rules for the agent toward the human
 
 The constitution carries rules for the reply, not only the code: a reply is ten lines or fewer, finished work is reported in a five-line envelope, a miss gets the corrected fact and no apology, nothing gets sized or clocked. The reply cap is gated by a pair of hooks: a Stop hook that only measures, and a UserPromptSubmit hook that instructs before the next reply once the log shows drift, so a well-behaved session pays nothing. The rest are recorded as judgment, honestly, with the reason no detector can exist. [`docs/agent-toward-human.md`](docs/agent-toward-human.md), [`docs/reply-length-gate.md`](docs/reply-length-gate.md)
 
 ### Also in the box
 
 - **The session-start pointer hook.** Detects the lane from the working directory, pulls, and injects a compact read-directive naming the exact files to read, never their contents (hook stdout truncates; a dumped file is a silently half-read file). [`docs/session-lifecycle.md`](docs/session-lifecycle.md)
-- **`audit-cheap.sh`**, fifteen sub-second drift checks wired into a pre-commit hook that judges only the staged set, so parallel sessions in one checkout do not fail each other's commits. [`docs/drift-checks.md`](docs/drift-checks.md)
+- **`audit-cheap.sh`**, seventeen sub-second drift checks wired into a pre-commit hook that judges only the staged set, so parallel sessions in one checkout do not fail each other's commits. [`docs/drift-checks.md`](docs/drift-checks.md)
 - **The rules sync** that propagates the constitution into every code lane, defers the commit in a repo with a live session (writes are safe, the git index is not), and can never write into a repo published to an outside reader, because its deny list derives from the publisher's own audience table. **The shared-repo publisher** with per-audience allow and deny lists, a fail-closed content scrub, an allowlisted commit and a second lock installed in the target. [`docs/rules-sync-and-shared-repos.md`](docs/rules-sync-and-shared-repos.md)
 - **`/preflight` and `/ship`**, the open and close of a build: five gates, a blind-spot pass, a bounded interview, a plan ordered by what will change, a deviation log the build writes into and the ship step folds into an honest Verified / Code-shipped / Inferred report.
 - **Worktree guidance** for two sessions in one lane, and what a driven session does to your git index. [`docs/parallel-lanes-worktrees.md`](docs/parallel-lanes-worktrees.md)
@@ -75,6 +88,7 @@ lane-os/
 ├── memory/                    # durable facts, one file per fact, indexed by MEMORY.md
 ├── projects/_TEMPLATE/        # STATUS.md + MEMORY.md mirror, one per code lane
 ├── desks/_TEMPLATE/           # CLAUDE.md + LOG.md, one per topic desk
+├── desks/_TEMPLATE-voice/     # a voice register: VOICE.md + voice.toml + corpus/ + outbox/
 ├── skills/                    # orient, catchup, today, week, since, spark, spin-lane, recall,
 │                              # reflect (+ implement mode), preflight, ship
 ├── hooks/session-start.sh     # detects the lane, pulls, injects the read-directive
@@ -84,7 +98,8 @@ lane-os/
 │   │   ├── advisory-reply-length.py     # Stop: measures the reply, silent
 │   │   ├── preflight-reply-length.py    # UserPromptSubmit: instructs on drift
 │   │   └── shared-repo-pre-commit.sh    # the second lock inside a shared repo
-│   ├── audit-cheap.sh         # 15 drift checks; the pre-commit gate runs it --staged
+│   ├── audit-cheap.sh         # 17 drift checks; the pre-commit gate runs it --staged
+│   ├── check-voice.py         # the 13 voice checks; --measure reads the register's corpus
 │   ├── find-decayed-rules.py  # gated / judgment / untriaged, the coverage ratchet
 │   ├── probe-concerns.py      # runs every concern's Probe, stamps the result
 │   ├── check-file-budgets.py  # the one budget table
@@ -142,6 +157,7 @@ A single ever-growing instruction file loads in full on every session, gets expe
 - [`docs/drift-checks.md`](docs/drift-checks.md), audit-cheap and the staged commit gate
 - [`docs/reply-length-gate.md`](docs/reply-length-gate.md), measure after, instruct before
 - [`docs/agent-toward-human.md`](docs/agent-toward-human.md), the behavioural rules
+- [`docs/voice-layer.md`](docs/voice-layer.md), distilled rules plus a raw corpus, and the draft linter
 - [`docs/switchboard.md`](docs/switchboard.md), what the other windows are doing
 - [`docs/rules-sync-and-shared-repos.md`](docs/rules-sync-and-shared-repos.md), propagation, and repos an outside reader sees
 - [`docs/parallel-lanes-worktrees.md`](docs/parallel-lanes-worktrees.md), two sessions in one lane
@@ -254,6 +270,11 @@ you return to repeatedly that is not a codebase. Each desk is `desks/<topic>/` w
 own `CLAUDE.md` (its contract and posture) and `LOG.md` (its running record). A desk
 session reads its own `CLAUDE.md` first and works from its slice; it does not load the
 whole brain.
+
+A **voice register** is a desk with two more files and a corpus: one register of one
+person's writing, so a session in it cannot answer in another register's voice or edit
+another register's files. Scaffold it with `scripts/new-lane.sh voice <register>`. See
+`docs/voice-layer.md`.
 
 ## Why mirror code lanes instead of putting status in the repo
 
@@ -810,6 +831,8 @@ the number on the rule it enforces; that is what makes "gated" a measurable word
 | 13 | The rules sync's deny list still derives from the publisher (`tests-shared-repos-never-sync.py`) | FAIL |
 | 14 | The two reply-length hooks share their limit and carve-outs, and both self-tests pass | FAIL |
 | 15 | No changed file carries a credential shape (runs in any repo) | FAIL |
+| 16 | Every voice check still fires on its positive sample and stays silent on its negative (`check-voice.py --self-test`) | FAIL |
+| 17 | Changed drafts under a register's `outbox/` carry no tell, and a changed corpus has been re-measured | WARN |
 
 ## The commit gate
 
@@ -838,6 +861,9 @@ pre-commit hook otherwise stages into the real index.
 - Give it a number and a `section`. Use `fail`, `warn`, `info`.
 - Scope it to `changed_paths` for anything prose-shaped. A corpus-wide retrofit is a
   different decision and usually the wrong one.
+- Ship it as a WARN. It becomes a FAIL only after it has passed on real work with no
+  false positive, and the promoting commit says how many. A gate that cries wolf teaches
+  the next session to bypass every gate, including the ones that were right.
 - Tune it until it is precise. A check that fires on a third of the corpus gets switched
   off, not obeyed.
 - A check that cannot run must say so, never report clean having measured nothing.
@@ -954,6 +980,161 @@ Every one of these except the reply cap is judgment, recorded as such in
 `global/rule-triage.tsv` with the reason no detector can exist. That honesty is part of
 the design: an un-gateable rule recorded as judgment stops reading as a gap, and the
 decay surface shrinks to work that is real.
+
+
+================================================================
+FILE: docs/voice-layer.md
+================================================================
+
+# The voice layer: rules drift, a corpus does not
+
+Ask for a voice and you will describe it: warm but direct, professional but human,
+confident not arrogant. Every writer alive would sign those adjectives, so the model
+returns the average of everyone who ever claimed them, and that average IS the
+corporate-brochure register. Describing a voice cannot escape it. The description is
+the problem.
+
+The fix is two files doing two different jobs, and the split is the whole insight.
+
+| | Holds | Good at | Fails by |
+|---|---|---|---|
+| `VOICE.md` | Short distilled rules: a "sound like" list and a longer "never sound like" list | Being read in two seconds and enforced by a linter | Drifting, because it is somebody's summary of a voice rather than the voice |
+| `corpus/` | Unedited real samples of the person's actual writing, stored as dated pulls, every old pull kept | Being the thing itself, so it cannot be averaged away | Going stale, which is why it is re-pulled rather than cleaned |
+
+The never-list does more of the work and is far easier to write, because "not that" is
+observable and "warm but direct" is not. The corpus is what the rules are checked
+against. Neither substitutes for the other, and a register with only one of them
+produces exactly the draft this layer exists to prevent.
+
+## Three things the corpus teaches that nobody guesses
+
+- **Replies matter more than posts.** A composed post is the edited voice. A reply is
+  the actual one. A corpus of published work alone still produces a stiff draft.
+- **Spoken transcripts are a separate register from typed text.** Mixing them produces
+  a draft that is neither, so `corpus/typed/` and `corpus/spoken/` stay apart and the
+  target medium picks one.
+- **Cleaning up a sample deletes the exact thing being captured.** The dropped word,
+  the lowercase start, the run-on: that is the fingerprint. Raw or nothing.
+
+## The instruction that changed the output more than any other
+
+It lives in the register's own `CLAUDE.md`, not in a chat message, so every session
+there gets it:
+
+> Before writing a line, open `corpus/` and read five to ten real samples in the same
+> register as the thing about to be written. Match those samples. Do not match an idea
+> of what professional sounds like. If nothing in the corpus fits the register, say so
+> and ask for a sample instead of guessing.
+
+## The linter
+
+A model asked to review its own prose is the same model that wrote it, so self-review
+misses the same things every time, in the same direction. `scripts/check-voice.py` runs
+thirteen checks that cannot be talked out of it. All mechanical: count, match, compare.
+
+```bash
+python3 scripts/check-voice.py desks/<register>/outbox/draft.md
+python3 scripts/check-voice.py --list          # the thirteen, one per line
+python3 scripts/check-voice.py --self-test     # each one on its positive AND its negative
+```
+
+| Check | Fires on |
+|---|---|
+| `em-dash` | An em-dash or horizontal bar, anywhere |
+| `ai-tell-word` | A word from the tell list, plus every backticked term in the register's never-list |
+| `rhetorical-close` | The draft closes on a question |
+| `staccato-run` | Three or more short sentences back to back, quotation fragments exempt |
+| `cadence-flat` | A short median with no sentence long enough to be a build |
+| `no-comma-splice` | A long draft with zero comma splices, which no person writes |
+| `contractions-low` | Contraction density under the writer's own floor: reads assembled |
+| `contractions-high` | Contraction density over the writer's own ceiling |
+| `comma-before-and` | The rate, printed every run, flagged outside the writer's own range |
+| `person-balance` | The first-to-second-person ratio, printed every run, flagged when an instructional draft's subject is the writer |
+| `post-too-long` | A post over the target platform's character limit |
+| `thread-too-long` | A thread over the target platform's post limit |
+| `unchecked-claim` | A price, stage or customer claim with no `checked:` marker |
+
+Two of them print their number on every run, passing or failing. Slow drift is
+invisible to a check that only speaks on failure.
+
+### The thresholds come from the corpus, not from a style guide
+
+Contraction density and comma rate are one writer's fingerprint, not a virtue. An
+absolute threshold would push every writer toward the same middle, which is the failure
+being fixed. So the ranges are measured from the register's own samples:
+
+```bash
+python3 scripts/check-voice.py --measure desks/<register> --write
+```
+
+That writes the `[measured]` block in the register's `voice.toml`. A register with no
+measured block gets a `not-measured` notice, never a silent pass, and Check 17 warns
+when a corpus pull lands without a re-measure.
+
+### The pattern worth copying: demand a marker, never guess
+
+Claims about a product's price, stage or customers are not this layer's to make, and
+the linter has no way to know the answer. It does not guess and it does not stay
+silent. It requires the draft to carry a marker proving a human checked:
+
+```markdown
+---
+medium: thread
+checked: price, customers
+---
+```
+
+Whenever a check cannot know the answer, demand the marker instead.
+
+## Two rules the layer depends on
+
+- **A new check ships as a warning.** It becomes a blocking failure only after it has
+  passed on real work with no false positive, and the promoting commit says how many.
+  A gate that cries wolf teaches the next session to bypass every gate, including the
+  ones that were right. Check 17 is a WARN today for exactly this reason; Check 16, the
+  linter's own self-test, is a FAIL, because a check that has stopped firing looks
+  identical to a clean draft.
+- **Scope a prose check to the changed files.** A corpus-wide retrofit on day one
+  buries the signal under a hundred findings nobody asked for, and the check gets
+  switched off. Check 17 reads `changed_paths`, the same scoping the commit gate uses.
+
+## Why this belongs in Lane OS
+
+A voice is not one voice. The same person writes in several registers, with different
+consequences for getting each one wrong, so each register gets its own folder, its own
+corpus and its own never-list:
+
+```
+desks/<register>/
+├── CLAUDE.md      the contract: read five to ten samples first, and the posture
+├── VOICE.md       sound like / never sound like; backticked terms are enforced
+├── voice.toml     [target] authored, [measured] written from the corpus
+├── corpus/
+│   ├── typed/     posts-YYYY-MM-DD.md, replies-YYYY-MM-DD.md
+│   └── spoken/    transcript-YYYY-MM-DD.md
+├── outbox/        drafts, linted before a human reads them
+└── LOG.md         the running record
+```
+
+That is a desk, so it inherits the whole invariant: a session opened in one register
+cannot answer in another's voice and cannot edit another's files, and the guard blocks
+it rather than the model remembering. This is the write-lane invariant applied to
+writing rather than to code, which is the reason the voice layer belongs here and not
+in a standalone prompt-engineering note.
+[`docs/write-lane-invariant.md`](write-lane-invariant.md)
+
+## Standing one up
+
+```bash
+scripts/new-lane.sh voice <register>              # from desks/_TEMPLATE-voice/
+$EDITOR desks/<register>/CLAUDE.md desks/<register>/VOICE.md
+# pull raw samples into desks/<register>/corpus/typed/ and corpus/spoken/
+python3 scripts/check-voice.py --measure desks/<register> --write
+```
+
+Then open a session in `desks/<register>/` and write. The template ships with the four
+corpus rules in `desks/_TEMPLATE-voice/corpus/README.md`, which is the file to read
+before the first pull.
 
 
 ================================================================
@@ -1437,7 +1618,7 @@ either name the hook or check that enforces it, or add a row to
 bash scripts/audit-cheap.sh
 ```
 
-Fifteen checks, about a second. The interesting ones on day one: Check 9 (the write-lane
+Seventeen checks, about a second. The interesting ones on day one: Check 9 (the write-lane
 guard blocks, 25 cases), Check 12 (the coverage line matches the file), Check 8 (every
 concern declares how it closes), Check 4 (every state file is inside its budget).
 
@@ -1461,7 +1642,25 @@ scripts/new-lane.sh desk research
 
 Fill that desk's `CLAUDE.md` with its posture, then open a session there.
 
-## 7. Use the lifecycle
+## 7. Add a voice register
+
+```bash
+scripts/new-lane.sh voice writing
+```
+
+Fill that register's `VOICE.md` with a "sound like" list and a longer "never sound like"
+list, then pull raw samples of your own writing into its `corpus/typed/` and
+`corpus/spoken/` and measure them:
+
+```bash
+python3 scripts/check-voice.py --measure desks/writing --write
+```
+
+The linter's thresholds now come from your own samples rather than from a style guide.
+Drop a draft in that register's `outbox/` and run `python3 scripts/check-voice.py` on it.
+[`docs/voice-layer.md`](voice-layer.md)
+
+## 8. Use the lifecycle
 
 - `/orient` when you sit down (spine session).
 - `/spark` to capture an idea from any lane without losing focus.
@@ -1472,7 +1671,7 @@ Fill that desk's `CLAUDE.md` with its posture, then open a session there.
   gate, not a note.
 - `/spin-lane` to graduate an idea into a real lane.
 
-## 8. Keep it honest
+## 9. Keep it honest
 
 - After any edit to `global/CLAUDE.md`: `python3 scripts/sync-rules.py`.
 - On a machine that stays on, schedule `scripts/probe-concerns.py`,

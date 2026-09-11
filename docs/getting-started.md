@@ -48,7 +48,7 @@ either name the hook or check that enforces it, or add a row to
 bash scripts/audit-cheap.sh
 ```
 
-Fifteen checks, about a second. The interesting ones on day one: Check 9 (the write-lane
+Seventeen checks, about a second. The interesting ones on day one: Check 9 (the write-lane
 guard blocks, 25 cases), Check 12 (the coverage line matches the file), Check 8 (every
 concern declares how it closes), Check 4 (every state file is inside its budget).
 
@@ -72,7 +72,25 @@ scripts/new-lane.sh desk research
 
 Fill that desk's `CLAUDE.md` with its posture, then open a session there.
 
-## 7. Use the lifecycle
+## 7. Add a voice register
+
+```bash
+scripts/new-lane.sh voice writing
+```
+
+Fill that register's `VOICE.md` with a "sound like" list and a longer "never sound like"
+list, then pull raw samples of your own writing into its `corpus/typed/` and
+`corpus/spoken/` and measure them:
+
+```bash
+python3 scripts/check-voice.py --measure desks/writing --write
+```
+
+The linter's thresholds now come from your own samples rather than from a style guide.
+Drop a draft in that register's `outbox/` and run `python3 scripts/check-voice.py` on it.
+[`docs/voice-layer.md`](voice-layer.md)
+
+## 8. Use the lifecycle
 
 - `/orient` when you sit down (spine session).
 - `/spark` to capture an idea from any lane without losing focus.
@@ -83,7 +101,7 @@ Fill that desk's `CLAUDE.md` with its posture, then open a session there.
   gate, not a note.
 - `/spin-lane` to graduate an idea into a real lane.
 
-## 8. Keep it honest
+## 9. Keep it honest
 
 - After any edit to `global/CLAUDE.md`: `python3 scripts/sync-rules.py`.
 - On a machine that stays on, schedule `scripts/probe-concerns.py`,

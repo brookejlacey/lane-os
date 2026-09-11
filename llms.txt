@@ -21,10 +21,11 @@ Lane OS solves three problems: (1) parallel sessions conflict when they all writ
 - [Context budgets](docs/context-budgets.md): byte budgets on every file a session reads whole, one table.
 - [Behavioural rules](docs/agent-toward-human.md): how the agent treats the human; the reply envelope.
 - [Memory](docs/memory.md): durable facts, one file per fact, frontmatter-indexed.
+- [The voice layer](docs/voice-layer.md): distilled rules plus a raw corpus, one register per lane, and the thirteen-check linter that reads a draft before a human does.
 
 ## Operating it
 
-- [Drift checks](docs/drift-checks.md): audit-cheap's fifteen checks and the staged commit gate.
+- [Drift checks](docs/drift-checks.md): audit-cheap's seventeen checks and the staged commit gate.
 - [The reply-length gate](docs/reply-length-gate.md): a Stop hook that measures, a UserPromptSubmit hook that instructs.
 - [The switchboard](docs/switchboard.md): what the other windows are doing, and what each lane is on.
 - [Rules sync and shared repos](docs/rules-sync-and-shared-repos.md): propagation that defers around live sessions and never reaches a repo an outside reader sees; the publisher.
@@ -41,6 +42,7 @@ Lane OS solves three problems: (1) parallel sessions conflict when they all writ
 - [hooks/session-start.sh](hooks/session-start.sh): detects the lane, pulls the spine, injects the read-directive.
 - [scripts/hooks/block-cross-lane-write.py](scripts/hooks/block-cross-lane-write.py): the PreToolUse guard that enforces the invariant.
 - [scripts/audit-cheap.sh](scripts/audit-cheap.sh): the drift checks.
+- [scripts/check-voice.py](scripts/check-voice.py): the voice linter; `--list`, `--self-test`, `--measure`.
 - [scripts/probe-concerns.py](scripts/probe-concerns.py), [scripts/check-file-budgets.py](scripts/check-file-budgets.py), [scripts/find-decayed-rules.py](scripts/find-decayed-rules.py), [scripts/sync-rules.py](scripts/sync-rules.py), [scripts/publish-shared-repo.py](scripts/publish-shared-repo.py), [scripts/build-switchboard.py](scripts/build-switchboard.py).
 
 ## Optional

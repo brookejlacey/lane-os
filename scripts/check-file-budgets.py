@@ -149,7 +149,8 @@ def measure() -> dict:
             if any((REPO / rel).is_symlink() for rel in path.relative_to(REPO).parents
                    if str(rel) != "."):
                 continue
-            if "_TEMPLATE" in path.parts:
+            # Scaffold dirs (_TEMPLATE, _TEMPLATE-voice) are not anybody's state file.
+            if any(part.startswith("_") for part in path.relative_to(REPO).parts):
                 continue
             chars = size_of(path)
             level = "ok"

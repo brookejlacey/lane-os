@@ -7,7 +7,7 @@
 #
 # This is the Lane OS answer to gbrain's `doctor` / `orphans`: same idea, no database.
 # It scans only the dirs where wikilinks are real DATA (brain, memory, projects, desks)
-# and skips READMEs, examples, and _TEMPLATE folders, which teach the [[link]] syntax
+# and skips READMEs, examples, and _TEMPLATE* folders, which teach the [[link]] syntax
 # in prose and would otherwise look like dangling links.
 #
 # Run from the spine root. Exits 1 if any FAIL is found, else 0. WARN does not fail.
@@ -17,7 +17,7 @@ cd "$(dirname "$0")/.."
 fail=0
 say() { printf '%s\n' "$*"; }
 SCAN=(brain memory projects desks)
-EXCL=(--include='*.md' --exclude='README.md' --exclude-dir='examples' --exclude-dir='_TEMPLATE')
+EXCL=(--include='*.md' --exclude='README.md' --exclude-dir='examples' --exclude-dir='_TEMPLATE*')
 
 # ---------- 1. Dangling wikilinks ----------
 say "== wikilinks =="

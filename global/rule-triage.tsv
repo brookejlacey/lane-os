@@ -26,3 +26,6 @@ a-handoff-states-goal-boundary-and-facts-the-other-sessi	JUDGMENT	A handoff is a
 build-pre-flight-before-any-non-trivial-build	JUDGMENT	Non-trivial is a judgment. A hook that fires on every new file is noise; /preflight is the mechanism and skipping it is the miss.
 log-deviations-during-the-build	JUDGMENT	Whether a judgment call was logged or silently absorbed cannot be detected from the code. /ship reads the log; an empty one is not evidence of none.
 ship-through-ship	JUDGMENT	Whether a change went through the ship flow is not recoverable from the commit. The commit gate covers the mechanical half.
+before-writing-a-line-open-the-register-s-corpus-and-read	JUDGMENT	Whether the corpus was actually read before drafting is a conversation event. The linter catches a draft that reads wrong, never a session that skipped the samples and got lucky.
+replies-outrank-posts-and-spoken-never-mixes-with-typed	JUDGMENT	Which samples a draft was built from leaves no trace in the draft. The directory split makes the wrong pull inconvenient; choosing the right one stays judgment.
+a-new-check-ships-as-a-warning	JUDGMENT	A rule about how the next check is introduced. A check that gated this one would have to judge whether a check was ready, which is the judgment being made.

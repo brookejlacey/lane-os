@@ -7,7 +7,8 @@
 # declared how they close, a write-lane guard that has quietly stopped blocking, a hook
 # that exists but is registered nowhere, a coverage claim that no longer matches the
 # rules file, a shared repo that would receive the private rules, a reply-length pair
-# that disagrees with itself, and a credential in a staged file.
+# that disagrees with itself, a voice check that has quietly stopped firing, a draft
+# that reads like a brochure, and a credential in a staged file.
 #
 # NOT a semantic audit. This catches the cheap stuff so the LLM pass only has to do the
 # hard stuff. Every check names its number; the constitution names the check on the
@@ -90,7 +91,15 @@ if [[ "$IS_SPINE" -eq 1 ]]; then
   _docs=$(ls global/*.md AGENTS.md README.md docs/*.md skills/*/SKILL.md 2>/dev/null)
   _broken=$(grep -ohE '`(scripts|hooks|global|brain|memory|skills|docs|projects|desks|switchboard)/[A-Za-z0-9_./*<>-]+`' $_docs 2>/dev/null \
     | tr -d '`' | grep -vE '[<>*]' | sort -u \
-    | while IFS= read -r p; do [[ -e "$p" || -e "${p%/}" ]] || echo "$p"; done)
+    | while IFS= read -r p; do
+        [[ -e "$p" || -e "${p%/}" ]] && continue
+        # A gitignored path is generated, not missing. switchboard/state.json does not
+        # exist in a fresh clone until build-switchboard.py has run once, and failing a
+        # new reader's very first audit over a file the machine creates is the false
+        # positive that teaches them the checks are noise.
+        git check-ignore -q "$p" 2>/dev/null && continue
+        echo "$p"
+      done)
   if [[ -n "$_broken" ]]; then
     fail "instruction docs reference paths that do not exist:"
     printf '%s\n' "$_broken" | sed 's/^/      /'
@@ -316,6 +325,56 @@ while IFS= read -r f; do
 done < <(changed_paths)
 if [[ -n "$_hits" ]]; then fail "a changed file carries something shaped like a credential:$_hits"
 else info "no credential shape in the changed files"; fi
+
+# ── Check 16: the voice linter still fires ─────────────────────────────────
+# Thirteen mechanical checks read every draft before a human does, because a model
+# reviewing its own prose is the same model that wrote it and misses the same things
+# every time. A linter whose checks have stopped firing looks exactly like a clean
+# draft, so assert every check on its own positive sample AND on its negative.
+section "Check 16: the voice linter still fires"
+if [[ "$IS_SPINE" -eq 1 && -f scripts/check-voice.py ]]; then
+  if _cv=$(python3 scripts/check-voice.py --self-test 2>&1); then
+    info "voice linter: $(printf '%s' "$_cv" | tail -1)"
+  else
+    fail "a voice check has stopped firing (scripts/check-voice.py --self-test):"
+    printf '%s\n' "$_cv" | grep FAIL | sed 's/^/      /'
+  fi
+fi
+
+# ── Check 17: changed drafts and corpora ───────────────────────────────────
+# WARN only, deliberately. A new check ships as a warning and becomes a FAIL only after
+# it has run on real drafts with no false positive; the promoting commit names how many.
+# A gate that cries wolf teaches the next session to bypass every gate.
+# Scoped to changed_paths for the same reason: a corpus-wide prose retrofit on day one
+# buries the signal, and a check that fires on a third of the corpus gets switched off.
+section "Check 17: changed drafts pass the voice linter"
+if [[ "$IS_SPINE" -eq 1 && -f scripts/check-voice.py ]]; then
+  _drafts=$(changed_paths 'desks/*/outbox/*.md')
+  if [[ -n "$_drafts" ]]; then
+    _n=$(printf '%s\n' "$_drafts" | grep -c .)
+    if _vl=$(printf '%s\n' "$_drafts" | tr '\n' '\0' | xargs -0 python3 scripts/check-voice.py 2>&1); then
+      info "$_n changed draft(s) under desks/*/outbox/, no tell fired"
+    else
+      warn "a changed draft carries a tell; the linter reads it before a human does:"
+      printf '%s\n' "$_vl" | grep -E 'FLAG|cannot read' | sed 's/^/      /'
+    fi
+  else
+    info "no draft changed under desks/*/outbox/"
+  fi
+  # A corpus pull that lands without a re-measure leaves the register's thresholds
+  # describing a corpus that no longer exists.
+  while IFS= read -r _reg; do
+    [[ -n "$_reg" && -f "$_reg/voice.toml" ]] || continue
+    # A scaffold register ships with an empty corpus on purpose. Firing on the template
+    # in a fresh clone is the false positive that teaches a reader to ignore the check.
+    [[ "$(basename "$_reg")" == _* ]] && continue
+    _m=$(python3 scripts/check-voice.py --check-measured "$_reg" 2>&1) || warn "$_m"
+  # Only real pulls. A freshly scaffolded register carries .gitkeep and the corpus
+  # README and no samples at all, and warning about that on the commit that created it
+  # is noise on day one.
+  done < <(changed_paths 'desks/*/corpus/*.md' | grep -v '/corpus/README\.md$' \
+             | cut -d/ -f1-2 | sort -u)
+fi
 
 # ── Result ─────────────────────────────────────────────────────────────────
 section "Result"

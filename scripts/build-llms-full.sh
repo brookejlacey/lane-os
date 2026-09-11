@@ -19,6 +19,7 @@ ORDER=(
   docs/drift-checks.md
   docs/reply-length-gate.md
   docs/agent-toward-human.md
+  docs/voice-layer.md
   docs/switchboard.md
   docs/rules-sync-and-shared-repos.md
   docs/parallel-lanes-worktrees.md

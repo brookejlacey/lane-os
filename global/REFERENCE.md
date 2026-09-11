@@ -81,6 +81,8 @@ small inline preview, and a dumped file is a silently half-read file.
 | 13 | Shared repos never receive the rules | `scripts/tests-shared-repos-never-sync.py` |
 | 14 | The reply-length pair agrees | both hooks' `--self-test` |
 | 15 | No credential shape in a changed file | |
+| 16 | Every voice check still fires | `scripts/check-voice.py --self-test` |
+| 17 | Changed drafts carry no tell; a changed corpus was re-measured (WARN) | `scripts/check-voice.py` |
 
 ## Scripts
 
@@ -88,10 +90,11 @@ small inline preview, and a dumped file is a silently half-read file.
 |---|---|
 | `scripts/install.sh` | One-time machine setup, idempotent |
 | `scripts/install-git-hooks.sh` | The pre-commit gate in the spine |
-| `scripts/new-lane.sh code\|desk <name>` | Scaffold a lane |
+| `scripts/new-lane.sh code\|desk\|voice <name>` | Scaffold a lane |
 | `scripts/lane-doctor.sh` | Dangling wikilinks, unindexed memory |
-| `scripts/audit-cheap.sh` | The 15 drift checks |
+| `scripts/audit-cheap.sh` | The 17 drift checks |
 | `scripts/find-decayed-rules.py` | Gated / judgment / untriaged |
+| `scripts/check-voice.py` | The 13 voice checks; `--measure` reads a register's corpus |
 | `scripts/probe-concerns.py` | Run every concern's Probe |
 | `scripts/check-file-budgets.py` | The budget table |
 | `scripts/sync-rules.py` | Constitution into every code lane |
@@ -125,5 +128,9 @@ no drift: `~/.claude/CLAUDE.md` -> `<spine>/global/CLAUDE.md`, `~/.claude/skills
   to `workspace.toml` so the rules sync reaches it. The mirror folder and the repo
   folder must share a name.
 - **New desk:** `scripts/new-lane.sh desk <topic>` and fill its `CLAUDE.md`.
+- **New voice register:** `scripts/new-lane.sh voice <register>`, fill its `VOICE.md`,
+  pull raw samples into its `corpus/`, then
+  `python3 scripts/check-voice.py --measure desks/<register> --write`. It is a desk, so
+  it inherits the desk write lane.
 - **New shared repo:** add an audience to `AUDIENCES` in `scripts/publish-shared-repo.py`.
   The sync denies it from that moment; Check 13 proves it.
