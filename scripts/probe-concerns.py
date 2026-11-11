@@ -55,7 +55,13 @@ DEFAULT_FILE = Path("brain/CONCERNS.md")
 PROBE_TIMEOUT = 120
 HUMAN = os.environ.get("LANE_OS_HUMAN", "you").strip().lower()
 
-OPEN_HEADING = re.compile(r"^### (?:[^\w\s]\s*)?(\d+)\. (.+)$", re.M)
+# Every ### heading under "## Right Now" is a concern. The status marker and the number are
+# both optional. The number used to be required, so a concern added without one was never
+# parsed: never probed, never flagged as undeclared, and the numbered concern above it
+# swallowed its text and put its stamp at the far end of it. The marker is a run of
+# symbols (an emoji with a variation selector is two code points) and never takes an
+# opening bracket, quote or emphasis mark, which belong to the title.
+OPEN_HEADING = re.compile(r"^### (?:[^\w\s\[\](){}*_`\"']+[ \t]*)?(?:(\d+)\.[ \t]+)?(.+)$", re.M)
 SECTION_END = re.compile(r"^## ", re.M)
 PROBE_LINE = re.compile(r"^\*\*Probe:\*\*\s*`(.+?)`\s*$", re.M)
 OWNER_LINE = re.compile(r"^\*\*Owner:\*\*\s*(.+?)\s*$", re.M)
@@ -63,7 +69,7 @@ STAMP_LINE = re.compile(r"^\*Probed \d{4}-\d{2}-\d{2}:.*?\*\n?", re.M | re.S)
 
 
 class Concern:
-    def __init__(self, number: str, title: str, body: str, start: int, end: int) -> None:
+    def __init__(self, number: str | None, title: str, body: str, start: int, end: int) -> None:
         self.number = number
         self.title = title
         self.body = body
@@ -75,6 +81,11 @@ class Concern:
         self.owner = owner.group(1) if owner else None
         self.result: str | None = None
         self.verdict: str | None = None
+
+    @property
+    def ref(self) -> str:
+        """How a report line names it: '#3 ' when numbered, nothing otherwise."""
+        return f"#{self.number} " if self.number else ""
 
     @property
     def declared(self) -> bool:
@@ -165,7 +176,7 @@ def main() -> int:
             print(f"{len(undeclared)} open concern(s) declare neither a Probe nor an Owner, "
                   "so nothing can ever close them without a human re-reading the file:")
             for c in undeclared:
-                print(f"      #{c.number} {c.title[:88]}")
+                print(f"      {c.ref}{c.title[:88]}")
             return 1
         print(f"all {len(concerns)} open concerns declare a Probe or an Owner")
         return 0
@@ -193,23 +204,23 @@ def main() -> int:
     if ready:
         print(f"\nREADY TO CLOSE ({len(ready)}), the closing event has happened; confirm, then move to the archive:")
         for c in ready:
-            print(f"  #{c.number} {c.title}\n      {c.result}")
+            print(f"  {c.ref}{c.title}\n      {c.result}")
     if unknown:
         print(f"\nCOULD NOT PROBE ({len(unknown)}), recorded, not treated as evidence:")
         for c in unknown:
-            print(f"  #{c.number} {c.title[:76]}\n      {c.result}")
+            print(f"  {c.ref}{c.title[:76]}\n      {c.result}")
     if human:
         print(f"\nDECISIONS OWED ({len(human)}), no probe can close these, only {HUMAN}:")
         for c in human:
-            print(f"  #{c.number} {c.title}")
+            print(f"  {c.ref}{c.title}")
     if lanes:
         print(f"\nOWNED WORK ({len(lanes)}), no passive signal; a lane has to do it:")
         for c in lanes:
-            print(f"  #{c.number} [{c.owner.split('.')[0].strip()}] {c.title}")
+            print(f"  {c.ref}[{c.owner.split('.')[0].strip()}] {c.title}")
     if undeclared:
         print(f"\nUNDECLARED ({len(undeclared)}), add a Probe or an Owner:")
         for c in undeclared:
-            print(f"  #{c.number} {c.title}")
+            print(f"  {c.ref}{c.title}")
     return 0
 
 

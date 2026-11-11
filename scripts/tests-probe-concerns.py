@@ -71,6 +71,32 @@ nothing here
 
 UNDECLARED = BODY.replace("**Owner:** the alpha lane\n", "")
 
+# A concern added without a number used to be invisible: never parsed, so never probed,
+# while the numbered concern above it swallowed its text and put its own stamp at the
+# far end of it.
+UNNUMBERED = """# Concerns
+
+## Right Now
+
+### 🟡 1. A numbered concern
+**Probe:** `echo "OPEN numbered still waiting"`
+
+### 🟡 A concern added without a number
+**Probe:** `echo "CLOSED the unnumbered event happened"`
+
+### A concern with neither a marker nor a number
+**Owner:** you
+
+## Resolved
+"""
+
+
+def section(text: str, heading: str) -> str:
+    """The text from `heading` to the next ### or ## heading."""
+    start = text.index(heading)
+    rest = [i for i in (text.find("\n### ", start + 1), text.find("\n## ", start + 1)) if i >= 0]
+    return text[start:min(rest) if rest else len(text)]
+
 
 def main() -> int:
     with tempfile.TemporaryDirectory() as tmp:
@@ -107,6 +133,28 @@ def main() -> int:
         f.write_text(BODY, encoding="utf-8")
         run(f, "--dry-run")
         check("dry-run writes nothing", BODY, f.read_text(encoding="utf-8"))
+
+        print("a concern without a number")
+        f.write_text(UNNUMBERED, encoding="utf-8")
+        rc, out = run(f)
+        check("it is parsed and its probe runs", True, "probed 2 of 3 open concerns" in out)
+        check("its CLOSED probe is flagged READY TO CLOSE under its own title", True,
+              "READY TO CLOSE (1)" in out and "A concern added without a number" in out.split("READY TO CLOSE")[-1])
+        check("an unmarked, unnumbered Owner: you is a decision owed", True,
+              "DECISIONS OWED (1)" in out and "neither a marker nor a number" in out)
+        after = f.read_text(encoding="utf-8")
+        numbered = section(after, "### 🟡 1. A numbered concern")
+        unnumbered = section(after, "### 🟡 A concern added without a number")
+        later = after[after.index("### 🟡 A concern added without a number"):]
+        check("the numbered concern above does not swallow the ones below it (no stamp of its lands there)",
+              False, ": OPEN, numbered" in later)
+        check("...and its stamp sits under its own heading", True, "*Probed " in numbered and ": OPEN, numbered" in numbered)
+        check("the unnumbered concern carries its own stamp", True, ": CLOSED, the unnumbered event happened*" in unnumbered)
+        check("one stamp per probed concern", 2, after.count("*Probed "))
+        f.write_text(UNNUMBERED.replace("**Owner:** you\n", ""), encoding="utf-8")
+        rc, out = run(f, "--check")
+        check("an undeclared unnumbered concern fails --check", 1, rc)
+        check("...and is named", True, "neither a marker nor a number" in out)
 
     print(f"tests-probe-concerns: {'PASS' if FAILS == 0 else f'FAIL ({FAILS})'}")
     return 1 if FAILS else 0
