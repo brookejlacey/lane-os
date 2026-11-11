@@ -24,6 +24,12 @@ import sys
 import tempfile
 from pathlib import Path
 
+# Run from the pre-commit gate, this inherits GIT_INDEX_FILE (and GIT_DIR in a linked
+# worktree) pointing at the live repo. It builds scratch repos and runs the publisher,
+# which calls git, so nothing it runs may see the live repo.
+for _k in [k for k in os.environ if k.startswith("GIT_")]:
+    del os.environ[_k]
+
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import workspace_lib as wl  # noqa: E402

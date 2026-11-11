@@ -17,6 +17,12 @@ import sys
 import tempfile
 from pathlib import Path
 
+# Run from the pre-commit gate, this inherits GIT_INDEX_FILE (and GIT_DIR in a linked
+# worktree) pointing at the live repo. It builds scratch repos, so nothing it runs may
+# see them.
+for _k in [k for k in os.environ if k.startswith("GIT_")]:
+    del os.environ[_k]
+
 SCRIPT = Path(__file__).resolve().parent / "check-file-budgets.py"
 FAILS = 0
 

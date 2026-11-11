@@ -18,6 +18,11 @@ import sys
 import tempfile
 from pathlib import Path
 
+# Run from the pre-commit gate, this inherits GIT_INDEX_FILE (and GIT_DIR in a linked
+# worktree) pointing at the live repo, and a probe is any shell command, git included.
+for _k in [k for k in os.environ if k.startswith("GIT_")]:
+    del os.environ[_k]
+
 SCRIPT = Path(__file__).resolve().parent / "probe-concerns.py"
 FAILS = 0
 

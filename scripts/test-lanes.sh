@@ -12,6 +12,11 @@
 # A fail-open guard cannot report its own death, so this test is the only evidence the
 # invariant is enforced. audit-cheap runs it on every commit.
 set -uo pipefail
+# audit-cheap runs this from the pre-commit hook, where git exports GIT_INDEX_FILE (and
+# GIT_DIR in a linked worktree) pointing at the LIVE repo. Inherited, the `git init`
+# below re-initializes that repo instead of a scratch one, and the guard resolves lanes
+# against it. Every git call here must see only its own scratch repos.
+for _v in $(compgen -e); do case "$_v" in GIT_*) unset "$_v" ;; esac; done
 cd "$(dirname "$0")/.."
 SPINE="$(pwd -P)"
 export LANE_OS_ROOT="$SPINE"

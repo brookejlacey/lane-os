@@ -13,9 +13,9 @@ set -uo pipefail
 
 # This test builds a scratch repo and stages files in it, but it runs from the PRE-COMMIT
 # HOOK, which exports GIT_INDEX_FILE (and friends) pointing at the REAL repo. Without this
-# every `git add` below would stage into the real index. Nothing here may inherit a git path.
-unset GIT_INDEX_FILE GIT_DIR GIT_WORK_TREE GIT_OBJECT_DIRECTORY \
-      GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_PREFIX GIT_COMMON_DIR
+# every `git add` below would stage into the real index. Nothing here may inherit a git
+# setting, so every GIT_* variable goes, not a list of the ones known today.
+for _v in $(compgen -e); do case "$_v" in GIT_*) unset "$_v" ;; esac; done
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 AUDIT="$HERE/audit-cheap.sh"
