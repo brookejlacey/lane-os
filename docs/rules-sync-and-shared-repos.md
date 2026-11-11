@@ -26,9 +26,15 @@ python3 scripts/sync-rules.py alpha      # one repo (an operator override)
 ```
 
 Per target it writes `.claude/global-rules.md` (a generated copy with a header saying
-so), makes sure the lane's `CLAUDE.md` imports it with `@.claude/global-rules.md` (so
-the lane's own mechanism notes stay), and keeps a marked block current in `AGENTS.md`
-for agents that read that instead.
+so) and keeps a marked block current in `AGENTS.md` for agents that read that instead.
+It never makes the lane's `CLAUDE.md` import the copy. On a machine `scripts/install.sh`
+set up, `~/.claude/CLAUDE.md` already links to the rules, so an import loaded them twice
+in every session, one copy a sync behind. An earlier version of the sync wrote that import
+itself, so a hand fix in a lane could not hold. Now it swaps an import line it finds for a
+short comment saying why. Its report warns on any lane that still mentions the copy.
+A clone on a machine without the symlink can import the copy by hand.
+`scripts/tests-no-duplicate-rules-import.py` holds it; Check 13 runs it when the sync
+changes.
 
 **Property 1: it never touches the git index of a repo with a session open.** It still
 writes the files, which is safe because they are generated and never hand-edited in a
@@ -64,6 +70,12 @@ spine. The publisher produces the repo they read, from one lane, under three rul
    is present. It installs `scripts/hooks/shared-repo-pre-commit.sh` into the target as
    a second lock, which refuses any staged file outside the published manifest. `inbox/`
    is the reader's, and flows the other way.
+
+It refuses to publish from a spine checkout that is behind origin, or when it cannot
+fetch to find out (exit 3). Every byte it publishes is derived from the spine and the
+target is overwritten whole, so a checkout behind does not publish less; it publishes old
+copies over newer ones. The reader then acts on the superseded version. Being ahead is
+fine. `scripts/tests-publish-stale-gate.py` proves it end to end against scratch repos.
 
 After the push it confirms against origin, not against its own exit code: a publisher
 that cannot see its own output is not finished.

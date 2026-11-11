@@ -11,7 +11,10 @@ The fix is not discipline. It is that a concern must declare how it gets checked
 
 ## The contract
 
-Every item under `## Right Now` declares one of:
+Every `###` heading under `## Right Now` is a concern; the status marker and the number
+in it are optional. An earlier parser required the number, so a concern added without one
+was never probed and the numbered one above it absorbed its text. Every item declares one
+of:
 
 ```markdown
 **Probe:** `<shell command>`

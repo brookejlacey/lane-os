@@ -225,6 +225,10 @@ if [[ -f brain/CONCERNS.md && -f scripts/probe-concerns.py ]]; then
   if _pc=$(python3 scripts/probe-concerns.py --check 2>&1); then info "$_pc"
   else fail "$(printf '%s' "$_pc" | head -1)"; printf '%s\n' "$_pc" | tail -n +2 | sed 's/^/      /'; fi
 fi
+if [[ -f scripts/tests-probe-concerns.py && -n "$(changed_paths scripts/probe-concerns.py scripts/tests-probe-concerns.py)" ]]; then
+  if _tp=$(python3 scripts/tests-probe-concerns.py 2>&1); then info "$(printf '%s' "$_tp" | tail -1)"
+  else fail "the concern parser test failed:"; printf '%s\n' "$_tp" | grep -E 'FAIL' | sed 's/^/      /'; fi
+fi
 
 # ── Check 9: the write-lane guard actually blocks ──────────────────────────
 # A fail-open guard cannot report its own death: a broken guard and an approving guard
@@ -263,16 +267,31 @@ _gate_test="scripts/tests-audit-cheap-staged.sh"
 if [[ "$IS_SPINE" -eq 1 && -z "${AUDIT_CHEAP_SELFTEST:-}" ]]; then
   if [[ ! -f "$_gate_test" ]]; then fail "$_gate_test is missing; --staged scoping has no test"
   else
-    _changed=$(changed_paths scripts/audit-cheap.sh "$_gate_test" scripts/install-git-hooks.sh)
+    _changed=$(changed_paths scripts/audit-cheap.sh "$_gate_test" scripts/install-git-hooks.sh scripts/tests-install-git-hooks.sh)
     if [[ -z "$_changed" ]]; then info "scoping test skipped (the gate's own code did not change)"
     elif _out=$(AUDIT_CHEAP_SELFTEST=1 bash "$_gate_test" 2>&1); then info "commit gate scopes to the staged set, and still blocks what is staged"
     else fail "commit-gate scoping test failed:"; printf '%s\n' "$_out" | sed 's/^/      /'; fi
+    # The installed hook refuses a commit when the checker is missing and guards merges too.
+    if [[ -n "$_changed" && -f scripts/tests-install-git-hooks.sh ]]; then
+      if _ih=$(AUDIT_CHEAP_SELFTEST=1 bash scripts/tests-install-git-hooks.sh 2>&1); then info "$(printf '%s' "$_ih" | tail -1)"
+      else fail "the hook installer test failed:"; printf '%s\n' "$_ih" | grep -E 'FAIL' | sed 's/^/      /'; fi
+    fi
+  fi
+  # A test that runs git from inside a hook inherits GIT_DIR and GIT_INDEX_FILE and can
+  # commit into the real repo. Prove every test clears them, whenever a test changed.
+  if [[ -f scripts/tests-fixture-isolation.sh && -n "$(changed_paths scripts/test-lanes.sh 'scripts/tests-*')" ]]; then
+    if _fi=$(AUDIT_CHEAP_SELFTEST=1 bash scripts/tests-fixture-isolation.sh 2>&1); then info "$(printf '%s' "$_fi" | tail -1)"
+    else fail "a test can reach the real repo through inherited GIT_* variables:"; printf '%s\n' "$_fi" | grep -E 'FAIL' | sed 's/^/      /'; fi
   fi
   # .git/hooks is not tracked, so a pull never updates the installed hook. Repair it.
   _hook="$(git rev-parse --git-path hooks/pre-commit 2>/dev/null)"
-  if [[ "$REPO_PATH" == "$SELF_REPO" && -f "$_hook" ]] && ! grep -q -- '--staged' "$_hook"; then
-    if bash scripts/install-git-hooks.sh >/dev/null 2>&1; then info "installed pre-commit hook was stale (whole-tree scope); reinstalled with --staged"
-    else fail "installed pre-commit hook scans the whole working tree; run: bash scripts/install-git-hooks.sh"; fi
+  # Stale means anything other than the installer's own body: a whole-tree scan, a hook that
+  # passes silently when the checker is missing, or a pre-merge-commit that was never installed.
+  _merge_hook="$(git rev-parse --git-path hooks/pre-merge-commit 2>/dev/null)"
+  if [[ "$REPO_PATH" == "$SELF_REPO" && -f "$_hook" ]] \
+     && ! { grep -q -- '--staged' "$_hook" && grep -q 'drift detector missing or not executable' "$_hook" && [[ -x "$_merge_hook" ]]; }; then
+    if bash scripts/install-git-hooks.sh >/dev/null 2>&1; then info "installed commit gate was stale; reinstalled pre-commit and pre-merge-commit"
+    else fail "installed commit gate is stale; run: bash scripts/install-git-hooks.sh"; fi
   fi
 fi
 
@@ -283,6 +302,16 @@ section "Check 13: the rules sync runs itself and never reaches a shared repo"
 if [[ "$IS_SPINE" -eq 1 && -f scripts/tests-shared-repos-never-sync.py ]]; then
   if _sr=$(python3 scripts/tests-shared-repos-never-sync.py 2>&1); then info "$(printf '%s' "$_sr" | tail -1)"
   else fail "the rules sync could reach a shared repo:"; printf '%s\n' "$_sr" | grep -E 'FAIL' | sed 's/^/      /'; fi
+fi
+# The sync never writes the rules import into a lane CLAUDE.md (the rules would load twice),
+# and the publisher refuses from a checkout behind origin. Each test runs when its code changed.
+if [[ "$IS_SPINE" -eq 1 && -f scripts/tests-no-duplicate-rules-import.py && -n "$(changed_paths scripts/sync-rules.py scripts/tests-no-duplicate-rules-import.py)" ]]; then
+  if _di=$(python3 scripts/tests-no-duplicate-rules-import.py 2>&1); then info "$(printf '%s' "$_di" | tail -1)"
+  else fail "the rules sync can load the rules twice in a lane:"; printf '%s\n' "$_di" | grep -E 'FAIL' | sed 's/^/      /'; fi
+fi
+if [[ "$IS_SPINE" -eq 1 && -f scripts/tests-publish-stale-gate.py && -n "$(changed_paths scripts/publish-shared-repo.py scripts/tests-publish-stale-gate.py)" ]]; then
+  if _ps=$(python3 scripts/tests-publish-stale-gate.py 2>&1); then info "$(printf '%s' "$_ps" | tail -1)"
+  else fail "the publisher can publish from a stale checkout:"; printf '%s\n' "$_ps" | grep -E 'FAIL' | sed 's/^/      /'; fi
 fi
 # The sync runs itself from a PostToolUse hook. Its test sleeps while a detached stub runs,
 # so it runs only when the hook or its test changed.

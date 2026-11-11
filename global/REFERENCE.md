@@ -45,7 +45,7 @@ stay registered.
 | Stop | `scripts/hooks/advisory-reply-length.py` | Measures the reply into `outputs/reply-length.jsonl`. Silent |
 | UserPromptSubmit | `scripts/hooks/preflight-reply-length.py` | Instructs before the next reply once the log shows drift |
 | PostToolUse (Write, Edit, MultiEdit, NotebookEdit) | `scripts/hooks/sync-rules-on-edit.sh` | After an edit to `global/CLAUDE.md`, starts `scripts/sync-rules.py` in the background; logs to `outputs/rules-sync.log` |
-| git pre-commit (spine) | installed by `scripts/install-git-hooks.sh` | `audit-cheap.sh --quiet --staged` |
+| git pre-commit and pre-merge-commit (spine) | installed by `scripts/install-git-hooks.sh` | `audit-cheap.sh --quiet --staged`; a missing checker refuses the commit |
 | git pre-commit (a shared repo) | `scripts/hooks/shared-repo-pre-commit.sh` | Refuses any staged file outside the published manifest |
 
 ## The SessionStart directive
@@ -114,6 +114,7 @@ small inline preview, and a dumped file is a silently half-read file.
 | `LANE_OS_LONG_FORM_DESKS` | Comma-separated desks where a long reply is correct |
 | `LANE_OS_HUMAN` | The Owner name that means "a decision only the human can make" (default `you`) |
 | `LANE_GUARD_OFF=1` | Disable the write-lane guard for one session |
+| `AUDIT_CHEAP_SKIP=1` | Skip only the drift detector in the commit gate for one commit; every other hook still runs |
 | `REPLY_LENGTH_ADVISORY=1` | Make the Stop half of the reply-length pair print its findings |
 | `LANE_OS_SHARED_TARGET` | Override the publisher's target checkout |
 

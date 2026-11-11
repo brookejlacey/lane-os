@@ -32,8 +32,9 @@ A code-lane session writes its own repo and its own mirror. Opening a terminal i
 mirror (`projects/<name>/`) is the same lane, addressed from the spine side; it does not
 become a spine session by being inside the spine.
 
-The lane's own `CLAUDE.md` holds mechanism only (commands, gotchas, hard rules) and
-imports the synced constitution. Release state lives in the mirror, not the repo.
+The lane's own `CLAUDE.md` holds mechanism only (commands, gotchas, hard rules). It does
+not import the synced constitution: `~/.claude/CLAUDE.md` already links to it. A second
+copy would load the rules twice. Release state lives in the mirror, not the repo.
 
 ## Topic desks
 

@@ -33,10 +33,12 @@ locations. If your spine lives somewhere unusual on a given machine, set
 
 ## The rules reach every code lane too
 
-Symlinks cover the machines you configured. `python3 scripts/sync-rules.py` covers the
-rest: it writes the constitution into each code lane's `.claude/global-rules.md` and
-`AGENTS.md`, so a standalone clone, a remote host or a cloud-style task in that repo
-reads the same rules. It defers the commit in a repo with a session open and never
+Symlinks cover the machines you configured. `python3 scripts/sync-rules.py` (which runs
+itself after an edit to the rules) writes the constitution into each code lane's
+`.claude/global-rules.md` and `AGENTS.md`, so an agent that reads `AGENTS.md` gets the
+same rules. It never adds an import of that copy to the lane's `CLAUDE.md`, because on a
+configured machine the rules would load twice. A clone on a machine without the symlink
+imports the copy by hand. It defers the commit in a repo with a session open and never
 touches a repo an outside reader sees. See
 [`rules-sync-and-shared-repos.md`](rules-sync-and-shared-repos.md).
 

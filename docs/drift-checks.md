@@ -43,9 +43,15 @@ reused.
 bash scripts/install-git-hooks.sh
 ```
 
-installs a pre-commit hook in the spine that runs `audit-cheap.sh --quiet --staged`. A
-FAIL blocks the commit. `.git/hooks/` is not tracked, so run it on every fresh clone;
-Check 11 repairs a stale installed hook on its own.
+installs a pre-commit hook in the spine that runs `audit-cheap.sh --quiet --staged`. It
+installs the same hook as `pre-merge-commit`, because git skips pre-commit on a merge and a merged
+branch would otherwise land unchecked. A FAIL blocks the commit. A missing or
+non-executable checker also refuses the commit: the earlier hook passed silently in that
+case, so a broken gate looked exactly like a clean commit. `AUDIT_CHEAP_SKIP=1 git commit`
+skips only this checker; `--no-verify` would skip every hook the repo has. `.git/hooks/` is
+not tracked, so run the installer on every fresh clone. Check 11 reinstalls a stale hook on
+its own. `scripts/tests-install-git-hooks.sh` proves both hooks with real commits and
+merges in a scratch repo.
 
 `--staged` is the important word. Parallel lane sessions run against one checkout.
 Without it the gate read the whole working tree, so another session's half-written file
@@ -56,8 +62,13 @@ view.
 
 `scripts/tests-audit-cheap-staged.sh` asserts both directions in a scratch repo: a
 foreign unstaged defect is ignored under `--staged`, and the same file staged still
-fails. It clears the inherited git environment first, because a test that runs from a
-pre-commit hook otherwise stages into the real index.
+fails. Every test that runs git clears every inherited `GIT_*` variable first, because a
+test run from inside a hook otherwise inherits `GIT_DIR` and `GIT_INDEX_FILE` and writes
+into the real repo. In the spine this came from, a hook self-test committed and pushed its
+fixture over main that way. `scripts/tests-fixture-isolation.sh` runs every test against a
+decoy repo with those variables exported; Check 11 runs it when a test changes. The audit
+itself sets `GIT_OPTIONAL_LOCKS=0`, so it never takes the index lock while parallel sessions
+commit.
 
 ## Writing a new check
 
