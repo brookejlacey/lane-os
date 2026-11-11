@@ -23,11 +23,19 @@ Three rules, in order of how much they matter:
 After the push it confirms against origin, not against its own exit code: a publisher
 that cannot see its own output is not finished.
 
+Before any of that it fetches the spine's own branch and refuses when the spine checkout
+is behind origin, or when it cannot tell (see source_checkout_is_current). Every byte it
+publishes is derived from the spine, so publishing from behind reverts the reader's repo.
+
 Usage:
   python3 scripts/publish-shared-repo.py <audience>             publish, commit, push
   python3 scripts/publish-shared-repo.py <audience> --dry-run   scan and report, write nothing
 
 The target checkout is <workspace root>/<audience>, or LANE_OS_SHARED_TARGET if set.
+
+Exit: 0 published (or nothing changed), 1 a missing target, empty lane or failed commit or
+push, 2 a deny-pattern hit, 3 refused: the spine checkout is behind origin or its state is
+unknown, or the target holds a file this script did not write, 4 the push did not land.
 """
 
 from __future__ import annotations
@@ -158,6 +166,45 @@ def run(cmd: list[str], cwd: pathlib.Path) -> subprocess.CompletedProcess:
     return subprocess.run(cmd, cwd=cwd, capture_output=True, text=True)
 
 
+def source_checkout_is_current(spine: pathlib.Path | None = None) -> tuple[bool, str]:
+    """Is the spine checkout this script runs from level with its origin?
+
+    Every file published is derived from the spine, and the target is reset to its origin
+    and overwritten wholesale. So a checkout that is BEHIND does not publish less; it
+    publishes OLD, silently reverting whatever a current checkout published before it,
+    and the reader acts on the superseded copy. A second machine, or a scheduled job on a
+    checkout that stopped pulling, is how this happens.
+
+    Fails CLOSED. A fetch that fails means staleness is unknown, and "cannot know" must not
+    read as "fine": a refused publish costs one run, a wrong one costs a document the
+    reader acts on. Being AHEAD is fine and is not checked; local work that has not been
+    pushed yet is still newer than origin.
+    """
+    spine = (spine or SPINE).resolve()
+    top = run(["git", "rev-parse", "--show-toplevel"], spine).stdout.strip()
+    if not top or pathlib.Path(top).resolve() != spine:
+        return False, f"{spine} is not a git checkout, so whether it is current is unknown"
+    branch = run(["git", "rev-parse", "--abbrev-ref", "HEAD"], spine).stdout.strip()
+    if not branch or branch == "HEAD":
+        return False, "the spine checkout is not on a branch (detached HEAD)"
+    fetched = run(["git", "fetch", "-q", "origin", branch], spine)
+    if fetched.returncode != 0:
+        detail = (fetched.stderr or fetched.stdout).strip().splitlines()
+        why = detail[-1] if detail else "no detail"
+        return False, f"could not fetch origin/{branch}, so whether this checkout is behind is unknown ({why})"
+    counted = run(["git", "rev-list", "--count", f"HEAD..origin/{branch}"], spine)
+    try:
+        behind = int(counted.stdout.strip()) if counted.returncode == 0 else None
+    except ValueError:
+        behind = None
+    if behind is None:
+        return False, f"could not compare HEAD against origin/{branch}"
+    if behind:
+        return False, (f"the spine checkout is {behind} commit(s) behind origin/{branch}; "
+                       "publishing would overwrite the shared repo with older copies")
+    return True, f"level with origin/{branch}"
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("audience", choices=sorted(AUDIENCES))
@@ -165,6 +212,24 @@ def main() -> int:
     args = ap.parse_args()
 
     cfg = select(args.audience)
+
+    # Before anything is read, scrubbed or written. A stale checkout is not a content
+    # problem the scrub can catch: every byte is clean and every byte is out of date. A dry
+    # run writes nothing, so it reports the problem and carries on.
+    current, why = source_checkout_is_current()
+    if not current:
+        if args.dry_run:
+            print(f"WARNING (dry run; a real publish would be refused): {why}", file=sys.stderr)
+        else:
+            print("PUBLISH ABORTED. Nothing was written.\n", file=sys.stderr)
+            print(f"  {why}", file=sys.stderr)
+            print(f"\n  Fix: git -C {SPINE} pull --rebase --autostash, then publish again.", file=sys.stderr)
+            print("  Do not bypass this. A publish from behind silently reverts the reader's repo.",
+                  file=sys.stderr)
+            return 3
+    else:
+        print(f"spine checkout: {why}")
+
     target: pathlib.Path = cfg["target"]
     if not args.dry_run and not (target / ".git").is_dir():
         print(f"target repo missing: {target}", file=sys.stderr)
