@@ -57,15 +57,21 @@ REPO = Path(os.environ.get("LANE_OS_BUDGET_ROOT") or Path(__file__).resolve().pa
 # (glob, warn, fail-or-None, why it is read whole)
 BUDGETS: list[tuple[str, int, int | None, str]] = [
     # ---- loaded into EVERY session. The only rows with a hard ceiling.
-    ("global/CLAUDE.md", 24_000, 40_000, "the rules, loaded every session on every lane"),
-    ("memory/MEMORY.md", 20_000, None, "the memory index, injected every session"),
+    # The rules are one line each, the detail in the memory file a line names, so the two
+    # files below are small by design. A new line is paid for by a trimmed one.
+    ("global/CLAUDE.md", 14_500, 18_000, "the rules, one line each, loaded every session on every lane"),
+    ("memory/MEMORY.md", 9_000, 12_000, "the index of memory files no rule names, loaded every session"),
+    # ---- loaded by every session whose cwd is inside the spine (the spine session, the
+    # desks, the project mirrors), on top of the rows above. A code window never loads it;
+    # its lane lines are printed by hooks/session-start.sh.
+    ("CLAUDE.md", 3_000, 5_000, "the spine's own rules, loaded by every session inside the spine"),
     ("brain/ACTIVE_NOW.md", 14_000, 24_000, "cross-project priorities, loaded every session"),
     ("brain/CONCERNS.md", 22_000, 36_000, "open worries, loaded every session"),
     # ---- read whole on demand by a spine session.
     ("brain/DECISIONS.md", 100_000, None, "never pruned by age, because an old decision still binds"),
     ("brain/PEOPLE.md", 60_000, None, "read whenever a person comes up"),
     ("brain/WEEKLY_LOG.md", 24_000, None, "a 2-week window by its own rule, so it should never grow"),
-    ("brain/WHO_I_AM.md", 24_000, None, "identity and working style, read by the orient skills"),
+    ("brain/WHO_I_AM.md", 24_000, None, "identity and working style, read on demand by a spine session"),
     # ---- per-lane state.
     ("projects/*/STATUS.md", 32_000, None, "session state; over budget a session greps it instead of reading it"),
     ("projects/*/MEMORY.md", 32_000, None, "durable lane facts; read BEFORE asserting one, so it is read whole"),
@@ -76,8 +82,10 @@ BUDGETS: list[tuple[str, int, int | None, str]] = [
 # The aggregate matters on its own: the real cost is the sum a session pays before it is
 # asked anything.
 ALWAYS_LOADED = ["global/CLAUDE.md", "memory/MEMORY.md", "brain/ACTIVE_NOW.md", "brain/CONCERNS.md"]
-AGGREGATE_WARN = 78_000
-AGGREGATE_FAIL = 104_000
+# Lowered with the one-line rules: the sum of the four warn lines is 59,500, so a warn above
+# that could never fire while each file passed alone.
+AGGREGATE_WARN = 50_000
+AGGREGATE_FAIL = 70_000
 
 # (file, warn, why) inside each code lane's repo. Warn only.
 CODE_REPO_BUDGETS: list[tuple[str, int, str]] = [

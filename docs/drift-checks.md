@@ -11,8 +11,9 @@ bash scripts/audit-cheap.sh --quiet    # FAIL lines only
 bash scripts/audit-cheap.sh --strict   # WARN fails too
 ```
 
-Exit 0 clean, 1 a FAIL, 2 usage. Every check has a number, and the constitution names
-the number on the rule it enforces; that is what makes "gated" a measurable word.
+Exit 0 clean, 1 a FAIL, 2 usage. Every check has a number. A rule a check enforces names
+that number on its line, so a reader of the rule can find what holds it. Numbers are never
+reused.
 
 ## The checks
 
@@ -20,17 +21,17 @@ the number on the rule it enforces; that is what makes "gated" a measurable word
 |---|---|---|
 | 1 | Every backticked repo path in the instruction docs exists | FAIL |
 | 2 | Every skill is a symlink in `~/.claude/skills` (installed spine only) | WARN |
-| 3 | Every `[[wikilink]]` resolves and every memory file is indexed (`lane-doctor`) | FAIL |
+| 3 | Every `[[wikilink]]` resolves; every memory file is named by a rule or listed in the index (`lane-doctor`) | FAIL |
 | 4 | Every state file is inside its byte budget (`check-file-budgets.py`) | WARN, FAIL at a hard ceiling |
 | 5 | `WEEKLY_LOG.md` holds only the last two weeks | WARN |
 | 6 | No `brain/drafts/` file is older than 7 days | WARN |
 | 7 | Every open concern is dated within 30 days | WARN |
 | 8 | Every open concern declares a Probe or an Owner (`probe-concerns.py --check`) | FAIL |
 | 9 | The write-lane guard still blocks (`test-lanes.sh`, 25 cases) | FAIL |
-| 10 | Every `block-*.py` hook and the reply-length pair are registered in settings.json (installed spine only) | FAIL |
+| 10 | Every `block-*.py` hook, the reply-length pair and the rules-sync hook are registered in settings.json (installed spine only) | FAIL |
 | 11 | The commit gate judges only the staged set (`tests-audit-cheap-staged.sh`, when the gate's own code changed); repairs a stale installed hook | FAIL |
-| 12 | The `Coverage today: N of M` line matches `find-decayed-rules.py --count` | FAIL; WARN on untriaged rules |
-| 13 | The rules sync's deny list still derives from the publisher (`tests-shared-repos-never-sync.py`) | FAIL |
+| 12 | Retired: the gated-coverage ratchet ([`gated-rules.md`](gated-rules.md)) | |
+| 13 | The rules sync's deny list still derives from the publisher (`tests-shared-repos-never-sync.py`); when the rules-sync hook changed, it still fires on `global/CLAUDE.md` alone (`tests-sync-rules-on-edit.sh`) | FAIL |
 | 14 | The two reply-length hooks share their limit and carve-outs, and both self-tests pass | FAIL |
 | 15 | No changed file carries a credential shape (runs in any repo) | FAIL |
 | 16 | Every voice check still fires on its positive sample and stays silent on its negative (`check-voice.py --self-test`) | FAIL |
@@ -72,4 +73,6 @@ pre-commit hook otherwise stages into the real index.
 - Say in the code what it deliberately does not catch.
 - Print the count on a passing run. Slow drift is invisible to a check that only speaks
   on failure.
-- Name it on the rule bullet in `global/CLAUDE.md` and restate the coverage line.
+- Name it on the rule's line, wherever that rule loads.
+- Build it only when it earns its place: the harm is outward or cannot be undone, or the
+  same miss has recurred ([`gated-rules.md`](gated-rules.md)).

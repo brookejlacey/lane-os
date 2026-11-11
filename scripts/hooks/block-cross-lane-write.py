@@ -170,11 +170,11 @@ def main():
             block(
                 "a CODE session (cwd " + repo_name + ") may write only its own repo, "
                 "its projects/" + repo_name + "/ mirror, and brain/drafts/. This "
-                "targets the spine. Stage it in brain/drafts/, or open a spine session."
+                "targets the spine. " "Stage it in brain/drafts/ and tell the spine session with SendMessage; the human is never the relay."
             )
         block(
             "a CODE session (cwd " + repo_name + ") is writing outside its lane: "
-            + target + ". Open a session in the repo that owns this file."
+            + target + ". " "Drive the lane that owns it (cd <that repo> && claude -p \"<goal>\") or SendMessage the session already working there."
         )
 
     # cwd is inside the spine. A project mirror, a desk, or workspace-root?
@@ -192,12 +192,12 @@ def main():
                 "a CODE session addressed by its mirror (cwd projects/" + proj + ") may "
                 "write only projects/" + proj + "/, the " + proj + " repo, and "
                 "brain/drafts/. Being inside the spine does not make this a spine "
-                "session. Stage it in brain/drafts/, or open a session at the spine root."
+                "session. " "Stage it in brain/drafts/ and tell the spine session with SendMessage; the human is never the relay."
             )
         if repo_for_path(target, SPINE):
             block(
                 "a CODE session (cwd projects/" + proj + ") is writing outside its lane: "
-                + target + ". Open a session in the repo that owns this file."
+                + target + ". " "Drive the lane that owns it (cd <that repo> && claude -p \"<goal>\") or SendMessage the session already working there."
             )
         sys.exit(0)
 
@@ -207,8 +207,7 @@ def main():
             sys.exit(0)
         block(
             "a DESK session (desks/" + desk + ") may write only its own desk + "
-            "brain/drafts/. This targets " + target + ". Stage in brain/drafts/, or "
-            "open the right lane."
+            "brain/drafts/. This targets " + target + ". " "Stage it in brain/drafts/ and tell the spine session with SendMessage; the human is never the relay."
         )
 
     # SPINE (workspace-root): owns the whole spine and the agent config dir.

@@ -5,14 +5,14 @@
 # references in instruction docs, a memory index out of sync, a state file over its byte
 # budget, a stale WEEKLY_LOG window, drafts rotting in staging, concerns that never
 # declared how they close, a write-lane guard that has quietly stopped blocking, a hook
-# that exists but is registered nowhere, a coverage claim that no longer matches the
-# rules file, a shared repo that would receive the private rules, a reply-length pair
-# that disagrees with itself, a voice check that has quietly stopped firing, a draft
-# that reads like a brochure, and a credential in a staged file.
+# that exists but is registered nowhere, a shared repo that would receive the private
+# rules, a reply-length pair that disagrees with itself, a voice check that has quietly
+# stopped firing, a draft that reads like a brochure, and a credential in a staged file.
 #
 # NOT a semantic audit. This catches the cheap stuff so the LLM pass only has to do the
-# hard stuff. Every check names its number; the constitution names the check on the
-# rule it enforces, which is what makes "gated" a measurable word.
+# hard stuff. Every check names its number, and a rule a check enforces names that
+# number, so a reader of the rule can find what holds it. Numbers are never reused:
+# Check 12 (the gated-coverage ratchet) was retired, and its number stays empty.
 #
 # Usage:
 #   scripts/audit-cheap.sh              # full working-tree view
@@ -37,6 +37,10 @@ while [[ $# -gt 0 ]]; do
     *) echo "unknown arg: $1" >&2; exit 2 ;;
   esac
 done
+
+# Parallel sessions commit in one checkout. A read-only git call can still refresh the
+# index and take index.lock, which fails another session's commit mid-flight.
+export GIT_OPTIONAL_LOCKS=0
 
 SELF_REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." 2>/dev/null && pwd -P)"
 [[ -z "$REPO_PATH" ]] && REPO_PATH="$SELF_REPO"
@@ -88,7 +92,7 @@ changed_paths() {
 # a wall. Scans the files an agent reads as instructions, skips placeholders (<name>, *).
 section "Check 1: broken file references"
 if [[ "$IS_SPINE" -eq 1 ]]; then
-  _docs=$(ls global/*.md AGENTS.md README.md docs/*.md skills/*/SKILL.md 2>/dev/null)
+  _docs=$(ls global/*.md CLAUDE.md AGENTS.md README.md docs/*.md skills/*/SKILL.md desks/*/CLAUDE.md 2>/dev/null)
   _broken=$(grep -ohE '`(scripts|hooks|global|brain|memory|skills|docs|projects|desks|switchboard)/[A-Za-z0-9_./*<>-]+`' $_docs 2>/dev/null \
     | tr -d '`' | grep -vE '[<>*]' | sort -u \
     | while IFS= read -r p; do
@@ -231,12 +235,12 @@ fi
 section "Check 10: blocking hooks are registered"
 if [[ "$IS_SPINE" -eq 1 && "$INSTALLED_HERE" -eq 1 ]]; then
   _settings="$HOME/.claude/settings.json"; _missing=""
-  for _hk in scripts/hooks/block-*.py scripts/hooks/preflight-reply-length.py scripts/hooks/advisory-reply-length.py; do
+  for _hk in scripts/hooks/block-*.py scripts/hooks/preflight-reply-length.py scripts/hooks/advisory-reply-length.py scripts/hooks/sync-rules-on-edit.sh; do
     [[ -f "$_hk" ]] || continue
     grep -q "$(basename "$_hk")" "$_settings" 2>/dev/null || _missing="$_missing $(basename "$_hk")"
   done
   if [[ -n "$_missing" ]]; then fail "hook(s) exist but are registered nowhere in $_settings:$_missing (run scripts/install.sh)"
-  else info "every guard and the reply-length pair are registered in ~/.claude/settings.json"; fi
+  else info "every guard, the reply-length pair and the rules-sync hook are registered in ~/.claude/settings.json"; fi
 elif [[ "$IS_SPINE" -eq 1 ]]; then
   info "skipped: this checkout is not the spine installed on this machine"
 fi
@@ -262,29 +266,21 @@ if [[ "$IS_SPINE" -eq 1 && -z "${AUDIT_CHEAP_SELFTEST:-}" ]]; then
   fi
 fi
 
-# ── Check 12: the gated-rule coverage ratchet ──────────────────────────────
-# global/CLAUDE.md opens by stating how many of its bullets are machine-enforced. That
-# number is measured from the file, never hand-typed, and restating it downward means
-# naming which gate was removed and why.
-section "Check 12: gated-rule coverage ratchet"
-if [[ -f global/CLAUDE.md && -f scripts/find-decayed-rules.py ]]; then
-  read -r _g _j _u <<< "$(python3 scripts/find-decayed-rules.py --count 2>/dev/null)"
-  _t=$(( ${_g:-0} + ${_j:-0} + ${_u:-0} ))
-  _claim=$(grep -oE 'Coverage today: [0-9]+ of [0-9]+' global/CLAUDE.md | head -1)
-  _cg=$(printf '%s' "$_claim" | awk '{print $3}'); _ct=$(printf '%s' "$_claim" | awk '{print $5}')
-  if [[ -z "$_claim" ]]; then fail "global/CLAUDE.md no longer states 'Coverage today: N of M bullets are gated'; that line is the ratchet's baseline"
-  elif [[ "$_g" != "$_cg" || "$_t" != "$_ct" ]]; then fail "global/CLAUDE.md claims '$_claim' but measures $_g of $_t; restate it from scripts/find-decayed-rules.py --count"
-  else info "gated-rule coverage: $_g of $_t bullets name a Hook or a Check ($(( _g * 100 / (_t > 0 ? _t : 1) ))%), $_j triaged as judgment"; fi
-  if [[ "${_u:-0}" -gt 0 ]]; then warn "$_u rule(s) are neither gated nor triaged (the decay surface): scripts/find-decayed-rules.py --untriaged"; fi
-fi
-
 # ── Check 13: shared repos never receive the rules ─────────────────────────
 # The deny list for the rules sync derives from the publisher's own audience table, so
 # a repo created for an outside reader is denied the day it exists. Assert the link.
-section "Check 13: shared repos never receive the global rules"
+section "Check 13: the rules sync runs itself and never reaches a shared repo"
 if [[ "$IS_SPINE" -eq 1 && -f scripts/tests-shared-repos-never-sync.py ]]; then
   if _sr=$(python3 scripts/tests-shared-repos-never-sync.py 2>&1); then info "$(printf '%s' "$_sr" | tail -1)"
   else fail "the rules sync could reach a shared repo:"; printf '%s\n' "$_sr" | grep -E 'FAIL' | sed 's/^/      /'; fi
+fi
+# The sync runs itself from a PostToolUse hook. Its test sleeps while a detached stub runs,
+# so it runs only when the hook or its test changed.
+if [[ "$IS_SPINE" -eq 1 && -f scripts/tests-sync-rules-on-edit.sh ]]; then
+  if [[ -z "$(changed_paths scripts/hooks/sync-rules-on-edit.sh scripts/tests-sync-rules-on-edit.sh)" ]]; then
+    info "rules-sync hook test skipped (the hook did not change)"
+  elif _so=$(bash scripts/tests-sync-rules-on-edit.sh 2>&1); then info "$(printf '%s' "$_so" | tail -1)"
+  else fail "the rules-sync hook no longer fires on global/CLAUDE.md alone:"; printf '%s\n' "$_so" | grep -E 'FAIL' | sed 's/^/      /'; fi
 fi
 
 # ── Check 14: the reply-length pair agrees with itself ─────────────────────

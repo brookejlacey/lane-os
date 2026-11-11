@@ -37,10 +37,11 @@ Fill in the templates. Start with the ones that matter most:
 - `brain/CONCERNS.md`: the open unknowns, each with a `**Probe:**` or an `**Owner:**`.
 - `workspace.toml`: your workspace roots and the code repos that receive the rules.
 
-Then trim `global/CLAUDE.md` to your actual rules. Every `- ` bullet in it is a rule:
-either name the hook or check that enforces it, or add a row to
-`global/rule-triage.tsv` saying why none can. Restate the `Coverage today` line from
-`python3 scripts/find-decayed-rules.py --count`; Check 12 will hold you to it.
+Then trim the rules to your own. Each is one line naming a memory file that holds its
+detail. Put a rule where it applies: `global/CLAUDE.md` for every session, the spine's
+`CLAUDE.md` for sessions inside the spine, the lane lines in `hooks/session-start.sh` for
+lanes. Start with fewer than you think you need. A correction becomes a rule line when the
+same miss happens a second time ([`miss-to-rule-loop.md`](miss-to-rule-loop.md)).
 
 ## 4. Prove the gates are live
 
@@ -48,9 +49,9 @@ either name the hook or check that enforces it, or add a row to
 bash scripts/audit-cheap.sh
 ```
 
-Seventeen checks, about a second. The interesting ones on day one: Check 9 (the write-lane
-guard blocks, 25 cases), Check 12 (the coverage line matches the file), Check 8 (every
-concern declares how it closes), Check 4 (every state file is inside its budget).
+Sixteen checks, about a second. The interesting ones on day one: Check 9 (the write-lane
+guard blocks, 25 cases), Check 8 (every concern declares how it closes), Check 4 (every
+state file is inside its budget), Check 1 (every path a rule names exists).
 
 ## 5. Add your first code lane
 
@@ -92,23 +93,26 @@ Drop a draft in that register's `outbox/` and run `python3 scripts/check-voice.p
 
 ## 8. Use the lifecycle
 
-- `/orient` when you sit down (spine session).
+- `/catchup` when you sit down in a spine session: it pulls, merges drafts and probes the
+  open concerns.
 - `/spark` to capture an idea from any lane without losing focus.
-- `/catchup` to re-sync a session after another window pushed changes; it merges drafts
-  and runs the concern probes.
+- `/catchup` again to re-sync any session after another window pushed changes.
+- `/recall` before saying something was never discussed: it searches the spine and the
+  session transcripts.
 - `/preflight` before a non-trivial build; `/ship` when it is done.
-- `/reflect implement` when a session taught you something: it lands the learning as a
-  gate, not a note.
+- `/reflect` when a session taught you something: it stages the note. `/reflect implement`
+  when you want that note made a rule or a gate.
 - `/spin-lane` to graduate an idea into a real lane.
 
 ## 9. Keep it honest
 
-- After any edit to `global/CLAUDE.md`: `python3 scripts/sync-rules.py`.
+- An edit to `global/CLAUDE.md` starts `scripts/sync-rules.py` on its own. After an edit
+  made from a shell command, run it by hand.
 - On a machine that stays on, schedule `scripts/probe-concerns.py`,
   `scripts/check-file-budgets.py --over-only` and `scripts/build-switchboard.py`.
 - When you publish a lane's docs to someone outside your workspace, add them as an
   audience in `scripts/publish-shared-repo.py` and publish through it. The sync denies
   that repo from that moment.
 
-That is the whole loop: orient, work in lanes, capture, merge from the spine, and let
-the checks catch what you forgot.
+That is the whole loop: sit down with `/catchup`, work in lanes, capture, merge from the
+spine and let the checks catch what you forgot.

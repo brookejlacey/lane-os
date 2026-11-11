@@ -54,6 +54,7 @@ ensure("SessionStart", "", "bash ~/.claude/hooks/session-start.sh", timeout=30)
 ensure("PreToolUse", "Write|Edit|MultiEdit|NotebookEdit", f"python3 {spine}/scripts/hooks/block-cross-lane-write.py")
 ensure("Stop", "", f"python3 {spine}/scripts/hooks/advisory-reply-length.py")
 ensure("UserPromptSubmit", "", f"python3 {spine}/scripts/hooks/preflight-reply-length.py")
+ensure("PostToolUse", "Write|Edit|MultiEdit|NotebookEdit", f"bash {spine}/scripts/hooks/sync-rules-on-edit.sh")
 json.dump(s, open(settings_path, "w"), indent=2)
 print("updated", settings_path)
 PY

@@ -42,5 +42,5 @@ is a single file with no per-session isolation.
 
 This page is judgment, not a gate: nothing mechanical stops two sessions opening the
 same checkout. A per-lane lockfile that queues a headless drive behind an open window
-would make it one, and is the obvious next gate to build. `global/rule-triage.tsv`
-records it as judgment for that reason, with the reason.
+would make it one. Until it exists the rule is a judgment line in `global/CLAUDE.md`
+naming `memory/feedback_one_checkout_per_session.md`.

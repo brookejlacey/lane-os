@@ -24,11 +24,12 @@ python3 scripts/check-file-budgets.py --json       # for a job
 
 | file | warn | fail |
 |---|---|---|
-| `global/CLAUDE.md` | 24k | 40k |
-| `memory/MEMORY.md` | 20k | |
+| `global/CLAUDE.md` | 14.5k | 18k |
+| `memory/MEMORY.md` | 9k | 12k |
 | `brain/ACTIVE_NOW.md` | 14k | 24k |
 | `brain/CONCERNS.md` | 22k | 36k |
-| the four above, summed | 78k | 104k |
+| the four above, summed | 50k | 70k |
+| `CLAUDE.md` at the spine root, sessions inside the spine only | 3k | 5k |
 | `brain/DECISIONS.md` | 100k | |
 | `brain/PEOPLE.md` | 60k | |
 | `brain/WEEKLY_LOG.md`, `brain/WHO_I_AM.md` | 24k | |
@@ -40,6 +41,13 @@ python3 scripts/check-file-budgets.py --json       # for a job
 | a code lane's `DECISIONS.md`, above `## Archive` | 30k | |
 
 Characters, not bytes: a budget about context cost is about characters.
+
+The rules and the index have small ceilings because each is one line per entry, with the
+detail in the memory file a line names. In the spine this came from, that rewrite took the
+always-loaded rules from about 25,000 characters to under 14,000 and the memory index from
+about 20,000 to 8,000. The ceilings were lowered to just above that. A new line is
+paid for by a trimmed one. The spine's own `CLAUDE.md` is budgeted on its own row: it is
+not loaded in a code window, so it stays out of the always-loaded sum.
 
 ## Threshold policy
 

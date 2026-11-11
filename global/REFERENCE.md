@@ -15,11 +15,11 @@ about the work at large, open the spine.
 | Project-specific docs, status updates | That repo (writes land in `projects/<name>/`), or `projects/<name>/` itself |
 | Cross-cutting context (ACTIVE_NOW, DECISIONS, CONCERNS, PEOPLE) | The spine (workspace-root) |
 | An ongoing non-code topic | Its `desks/<topic>/` |
-| Daily orient, cross-project planning, merges | The spine |
+| Sit-down `/catchup`, cross-project planning, merges | The spine |
 
 **The mid-session switch:** if something cross-cutting surfaces while you are in a
-code lane, do NOT update the spine from there. Stage to `brain/drafts/` and let a spine
-session merge it. Editing spine files from a code lane is exactly what the guard blocks.
+code lane, do NOT update the spine from there. Stage to `brain/drafts/` and tell the spine
+session with SendMessage in the same turn. Editing spine files from a code lane is exactly what the guard blocks.
 A lane you cannot write is still a lane you can drive: `cd <repo> && claude -p "<goal>"`.
 
 ## Session lifecycle: restart vs refresh
@@ -30,7 +30,7 @@ code) are read on demand and stay fresh.
 
 | What changed | What to do |
 |---|---|
-| `global/CLAUDE.md`, a skill file, the hook script, settings | Restart the affected session(s) |
+| `global/CLAUDE.md`, the spine's `CLAUDE.md`, a skill file, the hook script, settings | Restart the affected session(s) |
 | `brain/*.md`, a `STATUS.md`, memory bodies, code | Refresh (`/catchup`) in the affected session(s) |
 
 ## Hooks
@@ -44,6 +44,7 @@ stay registered.
 | PreToolUse (Write, Edit, MultiEdit, NotebookEdit) | `scripts/hooks/block-cross-lane-write.py` | The write-lane guard. Exit 2 blocks. Fails open on uncertainty; `LANE_GUARD_OFF=1` disables |
 | Stop | `scripts/hooks/advisory-reply-length.py` | Measures the reply into `outputs/reply-length.jsonl`. Silent |
 | UserPromptSubmit | `scripts/hooks/preflight-reply-length.py` | Instructs before the next reply once the log shows drift |
+| PostToolUse (Write, Edit, MultiEdit, NotebookEdit) | `scripts/hooks/sync-rules-on-edit.sh` | After an edit to `global/CLAUDE.md`, starts `scripts/sync-rules.py` in the background; logs to `outputs/rules-sync.log` |
 | git pre-commit (spine) | installed by `scripts/install-git-hooks.sh` | `audit-cheap.sh --quiet --staged` |
 | git pre-commit (a shared repo) | `scripts/hooks/shared-repo-pre-commit.sh` | Refuses any staged file outside the published manifest |
 
@@ -57,7 +58,9 @@ The hook looks at the working directory:
 - Inside `spine/desks/<topic>/`: **desk**.
 - Anywhere else in the spine: **spine (workspace-root)**.
 
-It then prints the lane's write boundary and the exact files to read, plus a trailer:
+It then prints the lane's write boundary, the LANE RULES (the rules that apply only to
+lanes; a code window gets all of them, a desk or mirror gets the lane line and the rest
+from the spine's `CLAUDE.md`), the exact files to read, plus a trailer:
 an ACTION line when `brain/drafts/` holds staged files, a NOTE when a pull failed and
 why (behind/ahead), and a SWITCHBOARD pointer. Pointers only: hook stdout truncates to a
 small inline preview, and a dumped file is a silently half-read file.
@@ -68,17 +71,17 @@ small inline preview, and a dumped file is a silently half-read file.
 |---|---|---|
 | 1 | Backticked repo paths in instruction docs exist | |
 | 2 | Skills are symlinks in `~/.claude/skills` | |
-| 3 | Wikilinks resolve, memory is indexed | `scripts/lane-doctor.sh` |
+| 3 | Wikilinks resolve; every memory file is named by a rule or the index | `scripts/lane-doctor.sh` |
 | 4 | State files inside their byte budgets | `scripts/check-file-budgets.py` |
 | 5 | `WEEKLY_LOG.md` is a 2-week window | |
 | 6 | No draft older than 7 days | |
 | 7 | Open concerns dated within 30 days | |
 | 8 | Open concerns declare a Probe or an Owner | `scripts/probe-concerns.py --check` |
 | 9 | The write-lane guard blocks | `scripts/test-lanes.sh` |
-| 10 | Every guard hook is registered | |
+| 10 | Every guard hook, the reply-length pair and the rules-sync hook are registered | |
 | 11 | The commit gate judges only the staged set | `scripts/tests-audit-cheap-staged.sh` |
-| 12 | The coverage line matches the file | `scripts/find-decayed-rules.py --count` |
-| 13 | Shared repos never receive the rules | `scripts/tests-shared-repos-never-sync.py` |
+| 12 | Retired (the gated-coverage ratchet); the number stays empty | |
+| 13 | Shared repos never receive the rules; the rules-sync hook fires on `global/CLAUDE.md` alone | `scripts/tests-shared-repos-never-sync.py`, `scripts/tests-sync-rules-on-edit.sh` |
 | 14 | The reply-length pair agrees | both hooks' `--self-test` |
 | 15 | No credential shape in a changed file | |
 | 16 | Every voice check still fires | `scripts/check-voice.py --self-test` |
@@ -92,12 +95,11 @@ small inline preview, and a dumped file is a silently half-read file.
 | `scripts/install-git-hooks.sh` | The pre-commit gate in the spine |
 | `scripts/new-lane.sh code\|desk\|voice <name>` | Scaffold a lane |
 | `scripts/lane-doctor.sh` | Dangling wikilinks, unindexed memory |
-| `scripts/audit-cheap.sh` | The 17 drift checks |
-| `scripts/find-decayed-rules.py` | Gated / judgment / untriaged |
+| `scripts/audit-cheap.sh` | The 16 drift checks |
 | `scripts/check-voice.py` | The 13 voice checks; `--measure` reads a register's corpus |
 | `scripts/probe-concerns.py` | Run every concern's Probe |
 | `scripts/check-file-budgets.py` | The budget table |
-| `scripts/sync-rules.py` | Constitution into every code lane |
+| `scripts/sync-rules.py` | Constitution into every code lane (runs itself after an edit, via the PostToolUse hook) |
 | `scripts/publish-shared-repo.py <audience>` | A lane's cleared slice into a shared repo |
 | `scripts/build-switchboard.py` | The cross-lane map |
 | `scripts/build-llms-full.sh` | Regenerate `llms-full.txt` from README + docs |

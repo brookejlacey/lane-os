@@ -12,7 +12,12 @@ syncing.
 
 ## The sync: `scripts/sync-rules.py`
 
-A rule that lives in one repo is not a rule. After any edit to `global/CLAUDE.md`:
+A rule that lives in one repo is not a rule. The sync runs itself: after any Write, Edit,
+MultiEdit or NotebookEdit that lands in `global/CLAUDE.md`, the PostToolUse hook
+`scripts/hooks/sync-rules-on-edit.sh` starts it in the background and logs to
+`outputs/rules-sync.log`. "After an edit, run the sync" used to be a prose rule, and code
+lanes worked to rules a day stale because it was run from memory. The hook cannot see an
+edit made by a shell command, so after one, run it by hand:
 
 ```bash
 python3 scripts/sync-rules.py            # write, commit, push in every target

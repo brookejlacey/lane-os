@@ -30,7 +30,7 @@ Content changed, not instructions. Use this to re-sync a running session.
 7. **Rebuild the brain coherently**: `ACTIVE_NOW` from `projects/*/STATUS.md` (1-3
    sentences per bullet, depth stays in STATUS), `WEEKLY_LOG` trimmed to two weeks,
    `CONCERNS` pruned, never re-dated.
-8. **If `global/CLAUDE.md` changed**, `python3 scripts/sync-rules.py`. A row reading
+8. **If `global/CLAUDE.md` changed**, `python3 scripts/sync-rules.py`. The PostToolUse hook already ran it after an edit through Write or Edit; this catches an edit made any other way, such as a pull. A row reading
    `deferred: session open` is not a failure.
 9. `bash scripts/audit-cheap.sh` must PASS, then commit and push.
 

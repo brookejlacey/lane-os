@@ -63,6 +63,14 @@ def main() -> int:
         check("a file over its hard ceiling exits 2", 2, rc)
         check("...and marks it as a ceiling breach", True, "OVER CEILING" in out)
 
+        print("the spine's own CLAUDE.md")
+        write(root / "brain" / "ACTIVE_NOW.md", 100)
+        write(root / "CLAUDE.md", 5_001)
+        rc, out = run(root, "--over-only")
+        check("the spine CLAUDE.md over its ceiling exits 2", 2, rc)
+        check("...and names the root file, not global/", True, "CLAUDE.md" in out and "OVER CEILING" in out)
+        write(root / "CLAUDE.md", 100)
+
         print("exactly at the threshold is not over")
         write(root / "brain" / "ACTIVE_NOW.md", 14_000)
         write(root / "projects" / "alpha" / "MEMORY.md", 32_000)
@@ -70,10 +78,10 @@ def main() -> int:
         check("a file exactly at its budget exits 0", 0, rc)
 
         print("aggregate of the always-loaded four")
-        write(root / "global" / "CLAUDE.md", 23_500)  # 23.5k+19k+14k+22k = 78,500
-        write(root / "memory" / "MEMORY.md", 19_000)
-        write(root / "brain" / "ACTIVE_NOW.md", 14_000)
-        write(root / "brain" / "CONCERNS.md", 22_000)
+        write(root / "global" / "CLAUDE.md", 14_000)  # 14k+8.5k+13.5k+21k = 57,000
+        write(root / "memory" / "MEMORY.md", 8_500)
+        write(root / "brain" / "ACTIVE_NOW.md", 13_500)
+        write(root / "brain" / "CONCERNS.md", 21_000)
         rc, out = run(root, "--over-only")
         check("the aggregate fires when every file passes alone", 1, rc)
         check("...and names the sum, not one file", True, "always-loaded" in out)

@@ -14,6 +14,10 @@ Two layers: a **verification layer** that runs while building (does it work, did
 regress anything), and an **independent review** by a second agent with no shared
 context, before merge. `/ship` runs the first fully and offers the second.
 
+The rule this skill carries, loaded here rather than in every session:
+
+- **Ship through `/ship`:** clean the diff, run the project's own gates for the change type, drive the UI, declare Verified vs Inferred, commit and push.
+
 ## Steps
 
 1. **Scope the change, and read the deviation log first.** `git status`, `git diff`,

@@ -19,6 +19,13 @@ guessed.
 - Any build beyond a quick edit: new repo, product surface, feature, script, doc system.
 - Unprompted at the first sign of "we're building X". Skipping it is the failure mode.
 
+## The rules this skill carries
+
+They apply only when a build starts, so they load here and not in every session:
+
+- **Build pre-flight before any non-trivial build:** the five gates, a blind-spot pass, a bounded interview and a plan ordered data model, interfaces, user-facing. It seeds the deviation log the build writes into.
+- **Log deviations during the build.** Pick the conservative option, record it under `## Deviations` in `implementation-notes.md` with the alternative, keep going. `/ship` folds the log into the report and deletes it.
+
 ## When not to run
 
 - A quick edit, a copy tweak, a one-liner, a change to code that already exists.

@@ -1,6 +1,6 @@
 ---
 name: recall
-description: Answer "what do I know about X" by searching the whole spine (brain/, memory/, projects/, desks/) with ripgrep, following [[wikilinks]], and synthesizing a cited answer with a staleness note. No database and no embeddings: disciplined search plus the model doing the synthesis. Use when you say "/recall X", "what do I know about X", "what's the latest on X", or "pull everything on X".
+description: Answer "what do I know about X" by searching the whole spine (brain/, memory/, projects/, desks/) and past session transcripts with ripgrep, following [[wikilinks]], and synthesizing a cited answer with a staleness note. No database and no embeddings: disciplined search plus the model doing the synthesis. Use when you say "/recall X", "what do I know about X", "what's the latest on X", or "pull everything on X".
 ---
 
 # /recall
@@ -17,6 +17,14 @@ Given a topic or query:
    `rg -i -C2 "<query>" brain/ memory/ projects/ desks/ global/ --type md`
    Also scan the `MEMORY.md` index and the frontmatter `description:` lines, so you find
    files whose body never says the literal term but whose summary does.
+
+   **Then search past sessions.** The spine holds what was written down; a transcript
+   holds what was said, including the decision nobody filed. Claude Code keeps one JSONL
+   file per session under `~/.claude/projects/`:
+   `rg -il --sortr modified "<query>" ~/.claude/projects/ --glob '*.jsonl'` lists the sessions, newest
+   first by mtime; `rg -io ".{0,200}<query>.{0,200}" <file>` shows each hit with bounded
+   context, since one JSONL line can be a whole tool result. A transcript hit is what was
+   said that day, so cite its date and check the spine before treating it as current.
 
 2. **Follow the links.** For every hit, pull its `[[wikilink]]` references and open those
    files too. The spine is a graph; the real answer is often one hop from the first hit.

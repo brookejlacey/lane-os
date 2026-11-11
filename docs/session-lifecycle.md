@@ -2,8 +2,9 @@
 
 ## What loads when
 
-A session loads three things once, at start: the constitution (`CLAUDE.md`), the
-SessionStart hook output, and any skill files it uses. These are cached for the life
+A session loads these once, at start: `global/CLAUDE.md` (every session), the spine's own
+`CLAUDE.md` (sessions inside the spine), the SessionStart hook output (which carries the
+lane rules for a code window) and any skill files it uses. These are cached for the life
 of the session. Everything else (`brain/` files, a lane's `STATUS.md`, the code) is
 read on demand and stays fresh.
 
@@ -25,7 +26,9 @@ re-reads it without losing your session history.
 4. Symlinks skills into `~/.claude/skills/` and prunes dead links.
 5. Pulls the current code repo if the session is in one.
 6. Detects the lane: code repo, code lane from its `projects/<name>/` mirror, desk, or spine.
-7. Emits a compact, lane-aware **read-directive**, plus a trailer: an ACTION line when
+7. Emits a compact, lane-aware **read-directive**: the write boundary, the LANE RULES
+   (the rules that apply only to lanes, printed here because a code window never loads
+   the spine's `CLAUDE.md`), the files to read, then a trailer: an ACTION line when
    `brain/drafts/` holds staged files, any pull failure, and a SWITCHBOARD pointer with
    the lane count and build time.
 8. Refreshes the switchboard in the background.
@@ -56,14 +59,15 @@ by every session before it is asked anything.
 | PreToolUse | `scripts/hooks/block-cross-lane-write.py` | Blocks an out-of-lane write |
 | UserPromptSubmit | `scripts/hooks/preflight-reply-length.py` | One line of context before the reply, only when recent replies drifted long |
 | Stop | `scripts/hooks/advisory-reply-length.py` | Measures the reply into a local log; silent |
+| PostToolUse | `scripts/hooks/sync-rules-on-edit.sh` | Starts the rules sync in the background after an edit to `global/CLAUDE.md` |
 
 `scripts/install.sh` registers all of them. See [`reply-length-gate.md`](reply-length-gate.md).
 
 ## What a spine session does at sit-down
 
-`/orient` (or `/catchup`): pull, re-read `ACTIVE_NOW` and `CONCERNS`, merge
-`brain/drafts/` into the right files, run `scripts/probe-concerns.py` so open concerns are
-probed rather than re-dated, and, if the constitution changed, `scripts/sync-rules.py`.
+`/catchup`: pull, re-read `ACTIVE_NOW` and `CONCERNS`, merge `brain/drafts/` into the
+right files, run `scripts/probe-concerns.py` so open concerns are probed rather than
+re-dated, and, if the constitution changed, `scripts/sync-rules.py`.
 `bash scripts/audit-cheap.sh` before the commit catches what that pass missed.
 
 ## Refreshing a long-running or remote session

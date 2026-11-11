@@ -1,8 +1,8 @@
 # Lane OS
 
-> A multi-session operating system for Claude Code: parallel, single-topic "lanes" over a shared, persistent context spine, with the rules that govern it enforced by hooks and commit checks instead of remembered. Lane OS is a repository layout plus a small set of hooks, checks, skills and conventions. It is a scaffold, not a dependency: you clone it, make it yours, and the conventions and the checks do the work.
+> A home repo for Claude Code that runs many windows at once: parallel, single-topic "lanes" over a shared, persistent context spine, each window locked to its own lane by a hook, with only the home window rebuilding the shared state. Lane OS is a repository layout plus a small set of hooks, checks, skills and conventions. It is a scaffold, not a dependency: you clone it, make it yours, and the conventions and the checks do the work.
 
-Lane OS solves three problems: (1) parallel sessions conflict when they all write the same shared state, (2) every new session starts amnesiac, and (3) rules held only in prose decay. The fixes: "one window = one topic" enforced by the write-lane invariant (a session may write only the lane it owns); a synthesis layer (brain/, memory/) read on demand via a pointer hook; and a constitution where every rule either names the hook or check that enforces it or is triaged as judgment, with the coverage ratio measured on every commit.
+Lane OS solves three problems: (1) parallel sessions conflict when they all write the same shared state, (2) every new session starts amnesiac, and (3) rules held only in prose decay. The fixes: "one window = one topic" enforced by the write-lane invariant (a session may write only the lane it owns); a synthesis layer (brain/, memory/) read on demand via a pointer hook; rules that load only where they apply, one line each pointing to a memory file; and gates kept for harm that is outward or cannot be undone. A correction is a note first, becomes a rule on the second miss and gets a hook only when the harm is outward.
 
 ## Start here
 
@@ -15,8 +15,8 @@ Lane OS solves three problems: (1) parallel sessions conflict when they all writ
 - [Architecture](docs/architecture.md): the three lane types and the shared spine.
 - [The write-lane invariant](docs/write-lane-invariant.md): the safety rule that makes parallelism work, the guard, and the test that proves the guard blocks.
 - [Session lifecycle](docs/session-lifecycle.md): the SessionStart pointer hook, restart versus refresh.
-- [Gated rules](docs/gated-rules.md): gated or judgment, the coverage ratchet, why a fail-open guard needs a self-test.
-- [The miss-to-rule loop](docs/miss-to-rule-loop.md): what a found miss turns into, and how /reflect implement runs it.
+- [Gated rules](docs/gated-rules.md): gated or judgment, when a gate earns its place, the retired coverage ratchet, why a fail-open guard needs a self-test.
+- [The miss-to-rule loop](docs/miss-to-rule-loop.md): a note first, a rule on the second miss, a gate only where it earns its place; where each rule's line loads.
 - [Concerns](docs/concerns.md): every open concern declares a Probe or an Owner.
 - [Context budgets](docs/context-budgets.md): byte budgets on every file a session reads whole, one table.
 - [Behavioural rules](docs/agent-toward-human.md): how the agent treats the human; the reply envelope.
@@ -25,25 +25,26 @@ Lane OS solves three problems: (1) parallel sessions conflict when they all writ
 
 ## Operating it
 
-- [Drift checks](docs/drift-checks.md): audit-cheap's seventeen checks and the staged commit gate.
+- [Drift checks](docs/drift-checks.md): audit-cheap's sixteen checks and the staged commit gate.
 - [The reply-length gate](docs/reply-length-gate.md): a Stop hook that measures, a UserPromptSubmit hook that instructs.
 - [The switchboard](docs/switchboard.md): what the other windows are doing, and what each lane is on.
 - [Rules sync and shared repos](docs/rules-sync-and-shared-repos.md): propagation that defers around live sessions and never reaches a repo an outside reader sees; the publisher.
 - [Parallel lanes and worktrees](docs/parallel-lanes-worktrees.md): two sessions in one lane.
 - [Multi-machine](docs/multi-machine.md): symlinks, sync, working across machines.
 - [Code from anywhere](docs/code-from-anywhere.md): real, non-sandbox sessions from your phone.
-- [Skills](skills): orient, catchup, today, week, since, spark, spin-lane, recall, reflect, preflight, ship.
+- [Skills](skills): catchup, since, spark, spin-lane, recall, reflect, preflight, ship.
 
 ## Key files
 
-- [global/CLAUDE.md](global/CLAUDE.md): the constitution; opens with its measured gated-coverage count.
-- [global/rule-triage.tsv](global/rule-triage.tsv): rules that genuinely cannot be gated, with the reason.
+- [global/CLAUDE.md](global/CLAUDE.md): the rules for every session, one line each, each naming its memory file.
+- [CLAUDE.md](CLAUDE.md): the rules for sessions inside the spine.
+- [memory/](memory): one fact per file; the rule files the loaded lines name.
 - [global/REFERENCE.md](global/REFERENCE.md): hooks, checks, scripts, environment variables, routing.
-- [hooks/session-start.sh](hooks/session-start.sh): detects the lane, pulls the spine, injects the read-directive.
+- [hooks/session-start.sh](hooks/session-start.sh): detects the lane, pulls the spine, prints the lane rules and the read-directive.
 - [scripts/hooks/block-cross-lane-write.py](scripts/hooks/block-cross-lane-write.py): the PreToolUse guard that enforces the invariant.
 - [scripts/audit-cheap.sh](scripts/audit-cheap.sh): the drift checks.
 - [scripts/check-voice.py](scripts/check-voice.py): the voice linter; `--list`, `--self-test`, `--measure`.
-- [scripts/probe-concerns.py](scripts/probe-concerns.py), [scripts/check-file-budgets.py](scripts/check-file-budgets.py), [scripts/find-decayed-rules.py](scripts/find-decayed-rules.py), [scripts/sync-rules.py](scripts/sync-rules.py), [scripts/publish-shared-repo.py](scripts/publish-shared-repo.py), [scripts/build-switchboard.py](scripts/build-switchboard.py).
+- [scripts/probe-concerns.py](scripts/probe-concerns.py), [scripts/check-file-budgets.py](scripts/check-file-budgets.py), [scripts/sync-rules.py](scripts/sync-rules.py), [scripts/publish-shared-repo.py](scripts/publish-shared-repo.py), [scripts/build-switchboard.py](scripts/build-switchboard.py).
 
 ## Optional
 

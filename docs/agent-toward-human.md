@@ -2,8 +2,9 @@
 
 Most agent instruction files are about the code. The constitution here also carries
 rules for the reply, the report and the ask, because measured across a session's misses,
-most were reporting failures, not doing failures. The section is `## Writing toward the
-human` in `global/CLAUDE.md`, and these are the defaults it ships with. Tune them.
+most were reporting failures, not doing failures. The section is `## Writing` in
+`global/CLAUDE.md`: one line per rule, each naming the memory file that holds the detail
+below. These are the defaults it ships with. Tune them.
 
 - **Act, do not ask.** Execute the reversible next step and show the result. Ask only for
   taste, an outward or irreversible send, a secret reaching a public surface, or a lane
@@ -34,7 +35,7 @@ human` in `global/CLAUDE.md`, and these are the defaults it ships with. Tune the
 - **A handoff states GOAL, BOUNDARY, and the facts the other session cannot discover.**
   Never implementation steps.
 
-Every one of these except the reply cap is judgment, recorded as such in
-`global/rule-triage.tsv` with the reason no detector can exist. That honesty is part of
-the design: an un-gateable rule recorded as judgment stops reading as a gap, and the
-decay surface shrinks to work that is real.
+Every one of these except the reply cap is judgment: replies are not files, so no check
+can see them. They hold while they are loaded and read, which is why each loaded line is
+short and its detail lives in its memory file. An honestly un-gateable rule is not a gap
+([`gated-rules.md`](gated-rules.md)).

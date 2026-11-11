@@ -38,6 +38,9 @@ fi
 # ---------- 2. Memory index sync ----------
 say "== memory index =="
 INDEX="memory/MEMORY.md"
+# Where a rule line can live: every session, sessions inside the spine, the lane lines the
+# session-start hook prints, and each desk's contract.
+RULE_HOMES="global/CLAUDE.md CLAUDE.md hooks/session-start.sh $(ls desks/*/CLAUDE.md 2>/dev/null | tr '\n' ' ')"
 if [ ! -f "$INDEX" ]; then
   say "  WARN no memory/MEMORY.md index found"
 else
@@ -46,8 +49,11 @@ else
     base=$(basename "$f")
     case "$base" in MEMORY.md|README.md) continue;; esac
     slug="${base%.md}"
-    if ! grep -q "$base" "$INDEX" && ! grep -q "\[\[${slug}\]\]" "$INDEX"; then
-      say "  WARN ${f} is not referenced in MEMORY.md (unindexed)"
+    # A rule's own line names its file, wherever that rule loads (a rule home), so a file
+    # a rule names is indexed there. Everything else is one line in MEMORY.md.
+    if ! grep -q "$base" "$INDEX" && ! grep -q "\[\[${slug}\]\]" "$INDEX" \
+       && ! grep -qs "$base" $RULE_HOMES; then
+      say "  WARN ${f} is not referenced in MEMORY.md or by a rule (unindexed)"
       unindexed=$((unindexed+1))
     fi
   done < <(find memory -maxdepth 1 -name '*.md' 2>/dev/null | sort)

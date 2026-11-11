@@ -4,8 +4,10 @@
 
 One git repository is the spine. It holds everything cross-cutting:
 
-- `global/`: the constitution (`CLAUDE.md`), the judgment triage (`rule-triage.tsv`),
-  and the read-on-demand `REFERENCE.md`.
+- `global/`: the constitution (`CLAUDE.md`, the rules that apply in every session, one
+  line each) and the read-on-demand `REFERENCE.md`.
+- `CLAUDE.md` at the spine root: the rules only sessions inside the spine need (spine
+  upkeep, the brain files). A code window never loads it.
 - `brain/`: the synthesis layer: identity, current priorities, decisions, concerns,
   people, a rolling log. Short state files, rebuilt by spine sessions from the lanes'
   mirrors and the drafts every lane may stage.
@@ -66,6 +68,22 @@ The SessionStart hook looks at the working directory:
 It then injects a directive naming that lane's write boundary and the exact files to
 read. See `docs/session-lifecycle.md`. The guard makes the same classification from the
 same rule, and `scripts/test-lanes.sh` asserts the two agree on 25 representative writes.
+
+## Rules load where they apply
+
+A rule that applies in one place loads there, never in every session:
+
+- `global/CLAUDE.md` loads in every session on every lane, and the rules sync copies it
+  into every code repo. It holds only what applies everywhere.
+- The spine's own `CLAUDE.md` loads in every session whose cwd is inside the spine.
+- The lane rules print in the SessionStart output, the one channel that reaches a code
+  window.
+- A voice register's rules live in its desk's `CLAUDE.md`. A build's rules live in
+  `/preflight` and `/ship`.
+
+Each line names a memory file holding its detail, so every loaded file stays one line
+per rule. `scripts/lane-doctor.sh` (Check 3) reads every one of these homes when it asks
+whether a memory file is reachable.
 
 ## The read side: the switchboard
 

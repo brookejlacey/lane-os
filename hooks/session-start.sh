@@ -109,7 +109,7 @@ fi
 
 # --- shared trailer: drafts, pull state, switchboard --------------------------
 trailer() {
-  draft_count=$(find "$SPINE/brain/drafts" -maxdepth 1 -name "*.md" 2>/dev/null | wc -l | tr -d ' ')
+  draft_count=$(find "$SPINE/brain/drafts" -maxdepth 1 -name "*.md" ! -name README.md 2>/dev/null | wc -l | tr -d ' ')
   if [ "${draft_count:-0}" -gt 0 ]; then
     echo "ACTION: brain/drafts/ holds ${draft_count} staged file(s) awaiting a spine-session merge (/catchup drains them)."
   fi
@@ -127,6 +127,26 @@ trailer() {
 READ_PREAMBLE='=== READ NOW (blocking): Read every file below before your first reply. ===
 Only these PATHS reached you, not the contents. The index files are tables of contents, not substitutes. Treat these as ground truth over assumptions.'
 
+# lane_rules <code|inside>: the rules for a lane, word for word. A rule that applies only to
+# lanes loads here rather than in global/CLAUDE.md, because this output is the one channel
+# that reaches a code window, whose cwd never loads the spine's own CLAUDE.md. `code` is a
+# window in a code repo and gets every line. `inside` is a desk or a project mirror, whose
+# cwd is inside the spine: it gets the lane lines, and the rest arrive with the spine's
+# CLAUDE.md. The heredocs are quoted, so nothing in a line is expanded.
+lane_rules() {
+  echo "LANE RULES (each line is the rule; a memory file it names is in ${SPINE}/memory/):"
+  cat <<'LANE_RULES'
+- **A lane that stages a draft tells the spine session in the same turn,** with SendMessage to that session; the human is never the relay. `feedback_lanes_tell_the_spine.md`
+LANE_RULES
+  [ "$1" = "code" ] || return 0
+  cat <<'LANE_RULES'
+- **A lane you cannot write is still a lane you can drive:** `cd <repo> && claude -p "<goal>"`. `feedback_drive_a_lane_you_cannot_write.md`
+- **Ask the neighbouring lane before re-deriving what it already knows;** each lane's `focus` is in `switchboard/state.json`. `feedback_ask_the_neighbouring_lane.md`
+- **A code repo's CLAUDE.md holds mechanism only** (commands, gotchas, hard rules); its state lives in the spine's `projects/<name>/`. Its instruction files carry budgets too: Check 4.
+- Routing: the write target owns the window; a raw idea goes to `/spark`, and a spine session's `/spin-lane` graduates it.
+LANE_RULES
+}
+
 # --- emit the compact, lane-aware read-directive -----------------------------
 if [ "$IS_CODE_LANE" = "1" ] && [ -n "$CODE_NAME" ]; then
   PDIR="$SPINE/projects/$CODE_NAME"
@@ -139,8 +159,10 @@ if [ "$IS_CODE_LANE" = "1" ] && [ -n "$CODE_NAME" ]; then
 === CODE LANE: ${CODE_NAME} (${WHERE}) ===
 
 WRITE LANE: write only under the ${CODE_NAME} repo, ${SPINE}/projects/${CODE_NAME}/, and ${SPINE}/brain/drafts/.
-FORBIDDEN even if asked: writing ${SPINE}/brain/ (except drafts/), /memory/, /global/, /skills/, or any other projects/<name>/. Decline before the write and redirect: open a spine session, or stage in brain/drafts/. A PreToolUse guard (scripts/hooks/block-cross-lane-write.py) blocks it anyway.
-A lane you cannot write is still a lane you can drive: cd <that repo> && claude -p "<goal>".
+FORBIDDEN even if asked: writing ${SPINE}/brain/ (except drafts/), /memory/, /global/, /skills/, or any other projects/<name>/. Decline before the write and redirect: stage in brain/drafts/ and tell the spine session. A PreToolUse guard (scripts/hooks/block-cross-lane-write.py) blocks it anyway.
+RULE
+  if [ "$MIRROR_CWD" = "1" ]; then lane_rules inside; else lane_rules code; fi
+  cat <<RULE
 
 ${READ_PREAMBLE}
   - ${SPINE}/brain/ACTIVE_NOW.md   (cross-cutting priorities)
@@ -156,7 +178,10 @@ elif [ "$IS_DESK" = "1" ] && [ -n "$DESK_NAME" ]; then
 === DESK: ${DESK_NAME} (cwd is desks/${DESK_NAME}, a TOPIC lane) ===
 
 WRITE LANE: write only under ${DDIR}/ and ${SPINE}/brain/drafts/.
-FORBIDDEN even if asked: writing ${SPINE}/brain/ (except drafts/), /memory/, /global/, /skills/, any other desk, or any code repo. Stage cross-cutting facts in brain/drafts/, or open the right lane. A PreToolUse guard (scripts/hooks/block-cross-lane-write.py) blocks it anyway.
+FORBIDDEN even if asked: writing ${SPINE}/brain/ (except drafts/), /memory/, /global/, /skills/, any other desk, or any code repo. Stage cross-cutting facts in brain/drafts/ and tell the spine session. A PreToolUse guard (scripts/hooks/block-cross-lane-write.py) blocks it anyway.
+RULE
+  lane_rules inside
+  cat <<RULE
 
 ${READ_PREAMBLE}
 Read your desk's OWN CLAUDE.md FIRST: it names your context slice + posture. Do NOT load the whole brain; a desk reads its slice.

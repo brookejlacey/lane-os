@@ -46,8 +46,10 @@ staged draft's claim about a specific hole was probed and the probe showed the g
 also failed its own docstring's example. So the test feeds it 25 representative writes,
 in both directions (over-blocking is its own outage), and the commit gate runs it.
 
-The guard also cannot see writes made through Bash redirection, so the routing reflex
-(open the window that owns the work) still matters.
+The guard sees Write, Edit, MultiEdit and NotebookEdit. It cannot see a write made
+through a shell command (a redirect, `sed -i`, a script), so the routing reflex still
+matters there. The spine this came from parses shell commands for their write targets;
+lane-os does not ship that parser.
 
 ## The mirror is the lane
 
@@ -59,13 +61,19 @@ repo of the same name under a workspace root, and `brain/drafts/`.
 
 ## When asked to write out of lane
 
-Decline and redirect BEFORE the write, never comply then apologize. Two redirects:
+Decline and redirect BEFORE the write, never comply then apologize. The redirect sends
+the fact to the lane that owns it, so the human never carries it by hand:
 
-- "Open a spine session and ask again there," or
-- "I will stage this in `brain/drafts/` for the next merge."
+- **Spine state:** stage it in `brain/drafts/` and tell the spine session in the same
+  turn, with SendMessage to that session. A draft nobody was told about waits for the
+  next `/catchup`.
+- **Another lane's files:** message the session already working there, or drive it.
 
-And a third option that is not a write at all: **a lane you cannot write is still a lane
-you can drive.** `cd <repo> && claude -p "<goal>"` runs a session in the right lane from
+The guard's block message says the same, word for word. An earlier version told the
+session to "open a spine session", which made the human the relay between two windows.
+
+The drive option is not a write at all: **a lane you cannot write is still a lane you can
+drive.** `cd <repo> && claude -p "<goal>"` runs a session in the right lane from
 where you are. Hand the human the window only when a session already works there.
 
 ## Same lane, two sessions
