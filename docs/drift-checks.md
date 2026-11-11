@@ -20,7 +20,7 @@ reused.
 | # | What it asserts | Level |
 |---|---|---|
 | 1 | Every backticked repo path in the instruction docs exists | FAIL |
-| 2 | Every skill is a symlink in `~/.claude/skills` (installed spine only) | WARN |
+| 2 | Every skill is a symlink in `~/.claude/skills` (installed spine only); when the SessionStart hook changed, it still leaves `~/.claude` alone from a spine that is not installed (`tests-session-start-home.sh`, temp HOME) | WARN; FAIL for the hook test |
 | 3 | Every `[[wikilink]]` resolves; every memory file is named by a rule or listed in the index (`lane-doctor`) | FAIL |
 | 4 | Every state file is inside its byte budget (`check-file-budgets.py`) | WARN, FAIL at a hard ceiling |
 | 5 | `WEEKLY_LOG.md` holds only the last two weeks | WARN |

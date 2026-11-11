@@ -128,6 +128,16 @@ elif [[ "$IS_SPINE" -eq 1 ]]; then
   info "skipped: this checkout is not the spine installed on this machine"
 fi
 
+# The SessionStart hook links skills into ~/.claude only when this checkout is the installed
+# spine. A hook run from a second checkout once replaced the installed skills, so whenever the
+# hook changes, prove it under a temp HOME.
+if [[ "$IS_SPINE" -eq 1 && -f scripts/tests-session-start-home.sh ]]; then
+  if [[ -z "$(changed_paths hooks/session-start.sh scripts/tests-session-start-home.sh)" ]]; then
+    info "session-start HOME test skipped (the hook did not change)"
+  elif _sh=$(bash scripts/tests-session-start-home.sh 2>&1); then info "$(printf '%s' "$_sh" | tail -1)"
+  else fail "the SessionStart hook can write ~/.claude from a spine that is not installed:"; printf '%s\n' "$_sh" | grep -E 'FAIL' | sed 's/^/      /'; fi
+fi
+
 # ── Check 3: memory index and wikilinks (lane-doctor) ──────────────────────
 section "Check 3: memory index shape and wikilinks"
 if [[ "$IS_SPINE" -eq 1 && -x scripts/lane-doctor.sh ]]; then

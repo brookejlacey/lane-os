@@ -22,8 +22,13 @@ re-reads it without losing your session history.
 
 1. Locates the spine repo (via `LANE_OS_ROOT` or auto-detection).
 2. Pulls the spine fast-forward-only, and records why if that fails (behind/ahead, or offline).
-3. Refreshes `~/.claude/CLAUDE.md` from the constitution (unless it is a symlink).
-4. Symlinks skills into `~/.claude/skills/` and prunes dead links.
+3. Checks that this checkout is the spine installed on this machine: `~/.claude/CLAUDE.md`
+   is a symlink into its `global/`. Only then does it touch `~/.claude`.
+4. Symlinks skills into `~/.claude/skills/` and prunes dead links, installed spine only. It
+   never deletes a real directory there. Run by hand from a fork, a test or a second
+   spine, the hook prints its directive plus a NOTE and leaves `~/.claude` alone; a hook
+   run from a second checkout once replaced the installed skills, which is why.
+   `scripts/tests-session-start-home.sh` proves it under a temp HOME.
 5. Pulls the current code repo if the session is in one.
 6. Detects the lane: code repo, code lane from its `projects/<name>/` mirror, desk, or spine.
 7. Emits a compact, lane-aware **read-directive**: the write boundary, the LANE RULES

@@ -1,7 +1,7 @@
 #!/bin/bash
 # Lane OS SessionStart hook.
-# Locate the spine repo, pull it, refresh user-level CLAUDE.md, symlink skills,
-# pull the current code repo if we are in one, then emit a COMPACT read-directive
+# Locate the spine repo, pull it, symlink skills (only when this checkout is the installed
+# spine), pull the current code repo if we are in one, then emit a COMPACT read-directive
 # that points the session at the right files for its lane.
 #
 # Pointers, not file dumps: hook stdout is truncated to a small inline preview when it
@@ -38,23 +38,27 @@ if ! (cd "$SPINE" && git pull --ff-only --quiet 2>/dev/null); then
   SPINE_PULL_FAILED=1; SPINE_PULL_STATE="$(pull_state "$SPINE")"
 fi
 
-# --- refresh user-level CLAUDE.md from the constitution -----------------------
-if [ -f "$SPINE/global/CLAUDE.md" ]; then
-  mkdir -p "$HOME/.claude"
-  # Only copy if it is NOT already a symlink (copying would clobber the link).
-  if [ ! -L "$HOME/.claude/CLAUDE.md" ]; then
-    cp "$SPINE/global/CLAUDE.md" "$HOME/.claude/CLAUDE.md"
-  fi
+# --- is THIS checkout the spine installed on this machine? ---------------------
+# Only then may the hook touch ~/.claude. install.sh makes ~/.claude/CLAUDE.md a symlink into
+# the installed spine's global/; anything else (no link, a link into another spine, a plain
+# file the human wrote) means this checkout is a fork under review, a test or a second spine,
+# and relinking ~/.claude/skills from it would replace the installed skills. Run by hand from
+# such a checkout, the hook still prints its directive and leaves ~/.claude alone.
+INSTALLED_HERE=0
+if [ -L "$HOME/.claude/CLAUDE.md" ]; then
+  _t="$(cd "$(dirname "$(readlink "$HOME/.claude/CLAUDE.md")")" 2>/dev/null && pwd -P)"
+  [ "$_t" = "$SPINE/global" ] && INSTALLED_HERE=1
 fi
 
-# --- sync skills as symlinks (never copies) ----------------------------------
-if [ -d "$SPINE/skills" ]; then
+# --- sync skills as symlinks (never copies), installed spine only ------------
+if [ "$INSTALLED_HERE" = "1" ] && [ -d "$SPINE/skills" ]; then
   mkdir -p "$HOME/.claude/skills"
   for skill_dir in "$SPINE/skills"/*/; do
     [ -d "$skill_dir" ] || continue
     name=$(basename "$skill_dir")
     link="$HOME/.claude/skills/$name"
-    if [ -e "$link" ] && [ ! -L "$link" ]; then rm -rf "$link"; fi
+    # A real directory here is something the human put there. Never delete it.
+    [ -e "$link" ] && [ ! -L "$link" ] && continue
     ln -sfn "${skill_dir%/}" "$link" 2>/dev/null || true
   done
   # prune links whose target was deleted (retired skills)
@@ -115,6 +119,7 @@ trailer() {
   fi
   [ "$SPINE_PULL_FAILED" = "1" ] && echo "NOTE: spine pull FAILED (${SPINE_PULL_STATE:-diverged or offline}); files may be stale."
   [ "$CODE_PULL_FAILED" = "1" ] && echo "NOTE: code repo pull FAILED (${CODE_PULL_STATE:-diverged or offline}); files may be stale."
+  [ "$INSTALLED_HERE" = "1" ] || echo "NOTE: ${SPINE} is not the spine installed on this machine (~/.claude/CLAUDE.md does not link into it), so ~/.claude was left alone. scripts/install.sh installs it."
   SB_STATE="$SPINE/switchboard/state.json"
   if [ -f "$SB_STATE" ]; then
     sb_built=$(grep -o '"built_human"[^,]*' "$SB_STATE" 2>/dev/null | head -1 | cut -d'"' -f4)

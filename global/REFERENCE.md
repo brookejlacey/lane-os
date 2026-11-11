@@ -40,7 +40,7 @@ stay registered.
 
 | Event | Script | Does |
 |---|---|---|
-| SessionStart | `hooks/session-start.sh` | Locates the spine, pulls, links skills, detects the lane, emits the read-directive, refreshes the switchboard |
+| SessionStart | `hooks/session-start.sh` | Locates the spine, pulls, links skills (installed spine only), detects the lane, prints the lane rules and the read-directive, refreshes the switchboard |
 | PreToolUse (Write, Edit, MultiEdit, NotebookEdit) | `scripts/hooks/block-cross-lane-write.py` | The write-lane guard. Exit 2 blocks. Fails open on uncertainty; `LANE_GUARD_OFF=1` disables |
 | Stop | `scripts/hooks/advisory-reply-length.py` | Measures the reply into `outputs/reply-length.jsonl`. Silent |
 | UserPromptSubmit | `scripts/hooks/preflight-reply-length.py` | Instructs before the next reply once the log shows drift |
@@ -70,7 +70,7 @@ small inline preview, and a dumped file is a silently half-read file.
 | # | Asserts | Backing script |
 |---|---|---|
 | 1 | Backticked repo paths in instruction docs exist | |
-| 2 | Skills are symlinks in `~/.claude/skills` | |
+| 2 | Skills are symlinks in `~/.claude/skills`; the SessionStart hook writes `~/.claude` only from the installed spine | `scripts/tests-session-start-home.sh` |
 | 3 | Wikilinks resolve; every memory file is named by a rule or the index | `scripts/lane-doctor.sh` |
 | 4 | State files inside their byte budgets | `scripts/check-file-budgets.py` |
 | 5 | `WEEKLY_LOG.md` is a 2-week window | |
